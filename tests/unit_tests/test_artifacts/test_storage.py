@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 import wandb
+from pydantic import ValidationError
 from pyfakefs.fake_filesystem import FakeFilesystem
 from wandb.sdk.artifacts.artifact import Artifact
 from wandb.sdk.artifacts.artifact_file_cache import ArtifactFileCache
@@ -568,9 +569,9 @@ def test_storage_policy_storage_region():
     wandb.Artifact("test", type="dataset", storage_region="coreweave-us")
     # local verification does not query from server to know the actual supported regions
     wandb.Artifact("test", type="dataset", storage_region="coreweave-404")
-    with pytest.raises(TypeError):
+    with pytest.raises(ValidationError):
         wandb.Artifact("test", type="dataset", storage_region=123)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         wandb.Artifact("test", type="dataset", storage_region="")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         wandb.Artifact("test", type="dataset", storage_region=" ")

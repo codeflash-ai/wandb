@@ -15,7 +15,9 @@ from urllib.parse import quote
 import requests
 
 from wandb.errors.term import termwarn
-from wandb.proto.wandb_internal_pb2 import ServerFeature
+from wandb.proto import wandb_internal_pb2 as pb
+from wandb.sdk.artifacts._gqlutils import server_supports
+from wandb.sdk.artifacts._models.storage import StoragePolicyConfig
 from wandb.sdk.artifacts.artifact_file_cache import (
     ArtifactFileCache,
     get_artifact_file_cache,
@@ -63,14 +65,12 @@ class WandbStoragePolicy(StoragePolicy):
 
     def __init__(
         self,
-        config: dict[str, Any] | None = None,
+        config: StoragePolicyConfig | dict[str, Any] | None = None,
         cache: ArtifactFileCache | None = None,
         api: InternalApi | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        self._config = config or {}
-        if (storage_region := self._config.get("storageRegion")) is not None:
-            self._validate_storage_region(storage_region)
+        self._config = StoragePolicyConfig.model_validate(config or {})
         self._cache = cache or get_artifact_file_cache()
         self._session = session or make_http_session()
         self._api = api or InternalApi()
@@ -79,16 +79,8 @@ class WandbStoragePolicy(StoragePolicy):
             default_handler=TrackingHandler(),
         )
 
-    def _validate_storage_region(self, storage_region: Any) -> None:
-        if not isinstance(storage_region, str):
-            raise TypeError(
-                f"storageRegion must be a string, got {type(storage_region).__name__}: {storage_region!r}"
-            )
-        if not storage_region.strip():
-            raise ValueError("storageRegion must be a non-empty string")
-
     def config(self) -> dict[str, Any]:
-        return self._config
+        return self._config.model_dump(exclude_none=True)
 
     def load_file(
         self,
@@ -184,8 +176,8 @@ class WandbStoragePolicy(StoragePolicy):
         artifact: Artifact,
         entry: ArtifactManifestEntry,
     ) -> str:
-        layout = self._config.get("storageLayout", StorageLayout.V1)
-        region = self._config.get("storageRegion", "default")
+        layout = self._config.storage_layout or StorageLayout.V1
+        region = self._config.storage_region or "default"
 
         entity_name = artifact.entity
         project_name = artifact.project
@@ -195,13 +187,13 @@ class WandbStoragePolicy(StoragePolicy):
 
         base_url: str = api.settings("base_url")
 
-        if layout == StorageLayout.V1:
+        if layout is StorageLayout.V1:
             return f"{base_url}/artifacts/{entity_name}/{md5_hex}"
 
-        if layout == StorageLayout.V2:
+        if layout is StorageLayout.V2:
             birth_artifact_id = entry.birth_artifact_id or ""
-            if api._server_supports(
-                ServerFeature.ARTIFACT_COLLECTION_MEMBERSHIP_FILE_DOWNLOAD_HANDLER
+            if server_supports(
+                api.client, pb.ARTIFACT_COLLECTION_MEMBERSHIP_FILE_DOWNLOAD_HANDLER
             ):
                 return f"{base_url}/artifactsV2/{region}/{quote(entity_name)}/{quote(project_name)}/{quote(artifact_name)}/{quote(birth_artifact_id)}/{md5_hex}/{entry.path.name}"
 

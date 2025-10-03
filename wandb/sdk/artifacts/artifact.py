@@ -270,7 +270,7 @@ class Artifact:
         self._digest: str | None = None
 
         self._manifest: ArtifactManifest | None = ArtifactManifestV1(
-            storage_policy=make_storage_policy(storage_region)
+            storage_policy=make_storage_policy(storage_region=storage_region)
         )
 
         self._commit_hash: str | None = None
