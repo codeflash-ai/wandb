@@ -7,8 +7,8 @@ from pytest import fixture, skip
 from wandb import Api, Artifact
 from wandb.apis.public.registries._utils import fetch_org_entity_from_organization
 from wandb.apis.public.registries.registry import Registry
-from wandb.proto.wandb_internal_pb2 import ServerFeature
-from wandb.sdk.internal.internal_api import Api as InternalApi
+from wandb.proto import wandb_internal_pb2 as pb
+from wandb.sdk.artifacts._gqlutils import server_supports
 from wandb.util import random_string
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ def org(team_and_org: TeamAndOrgNames) -> str:
 
 @fixture
 def org_entity(org: str, api: Api) -> str:
-    if not InternalApi()._server_supports(ServerFeature.ARTIFACT_REGISTRY_SEARCH):
+    if not server_supports(api.client, pb.ARTIFACT_REGISTRY_SEARCH):
         skip("Cannot fetch org entity on this server version.")
 
     return fetch_org_entity_from_organization(api.client, org)
@@ -44,9 +44,7 @@ def org_entity(org: str, api: Api) -> str:
 @fixture
 def registry(org: str, api: Api, worker_id: str) -> Registry:
     # Full name will be "wandb-registry-model"
-    if not InternalApi()._server_supports(
-        ServerFeature.INCLUDE_ARTIFACT_TYPES_IN_REGISTRY_CREATION
-    ):
+    if not server_supports(api.client, pb.INCLUDE_ARTIFACT_TYPES_IN_REGISTRY_CREATION):
         skip("Cannot create a test registry on this server version.")
 
     return api.create_registry(

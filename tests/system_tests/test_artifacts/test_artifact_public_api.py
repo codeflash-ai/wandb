@@ -7,15 +7,16 @@ import requests
 import wandb
 from wandb._strutils import nameof
 from wandb.errors.errors import CommError
-from wandb.proto.wandb_internal_pb2 import ServerFeature
+from wandb.proto import wandb_internal_pb2 as pb
 from wandb.sdk.artifacts._generated import (
     ArtifactByName,
     ArtifactFragment,
     ArtifactMembershipByName,
     ArtifactMembershipFragment,
+    FetchOrgInfoFromEntity,
 )
+from wandb.sdk.artifacts._gqlutils import server_supports
 from wandb.sdk.artifacts.exceptions import ArtifactFinalizedError
-from wandb.sdk.internal.internal_api import Api as InternalApi
 
 
 @pytest.fixture
@@ -404,16 +405,28 @@ def test_fetch_registry_artifact(
     is_registry_project,
     expected_artifact_fetched,
 ):
-    server_supports_artifact_via_membership = InternalApi()._server_supports(
-        ServerFeature.PROJECT_ARTIFACT_COLLECTION_MEMBERSHIP
+    server_supports_artifact_via_membership = server_supports(
+        api.client, pb.PROJECT_ARTIFACT_COLLECTION_MEMBERSHIP
     )
 
     mocker.patch("wandb.sdk.artifacts.artifact.Artifact._from_attrs")
 
-    mock__resolve_org_entity_name = mocker.patch(
-        "wandb.sdk.internal.internal_api.Api._resolve_org_entity_name",
-        return_value=resolve_org_entity_name,
+    # Stub the query for orgEntity name(s)
+    mock_org_entity_info_responder = wandb_backend_spy.gql.Constant(
+        content={
+            "data": {
+                "entity": {
+                    "organization": {
+                        "name": "org-name",
+                        "orgEntity": {"name": resolve_org_entity_name},
+                    },
+                    "user": None,
+                },
+            }
+        }
     )
+    op_matcher = wandb_backend_spy.gql.Matcher(operation=nameof(FetchOrgInfoFromEntity))
+    wandb_backend_spy.stub_gql(match=op_matcher, respond=mock_org_entity_info_responder)
 
     mock_artifact_fragment_data = ArtifactFragment(
         name="test-collection",  # NOTE: relevant
@@ -502,9 +515,12 @@ def test_fetch_registry_artifact(
         api.artifact(artifact_path)
 
     if is_registry_project:
-        mock__resolve_org_entity_name.assert_called_once()
+        assert mock_org_entity_info_responder.total_calls == 1
     else:
-        mock__resolve_org_entity_name.assert_not_called()
+        assert mock_org_entity_info_responder.total_calls == 0
 
     # Ensure at least one of the artifact queries was exercised
-    assert mock_responder.total_calls == 1
+    if expected_artifact_fetched:
+        assert mock_responder.total_calls == 1
+    else:
+        assert mock_responder.total_calls == 0

@@ -7,9 +7,9 @@ import wandb
 from pytest import fixture, mark, raises, skip
 from wandb import Api, Artifact
 from wandb.apis.public.registries.registry import Registry
-from wandb.proto.wandb_internal_pb2 import ServerFeature
+from wandb.proto import wandb_internal_pb2 as pb
+from wandb.sdk.artifacts._gqlutils import server_supports
 from wandb.sdk.artifacts._validators import REGISTRY_PREFIX
-from wandb.sdk.internal.internal_api import Api as InternalApi
 
 
 @fixture
@@ -20,11 +20,9 @@ def default_organization(user_in_orgs_factory) -> Iterator[str]:
 
 
 @fixture
-def skip_if_server_does_not_support_create_registry() -> None:
+def skip_if_server_does_not_support_create_registry(api: Api) -> None:
     """Skips the test for older server versions that do not support Api.create_registry()."""
-    if not InternalApi()._server_supports(
-        ServerFeature.INCLUDE_ARTIFACT_TYPES_IN_REGISTRY_CREATION
-    ):
+    if not server_supports(api.client, pb.INCLUDE_ARTIFACT_TYPES_IN_REGISTRY_CREATION):
         skip("Cannot create a test registry on this server version.")
 
 
