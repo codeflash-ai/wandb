@@ -410,6 +410,7 @@ strict_equality = true
 module = [
     "psutil.*",
     "tensorboard.*",
+    "google.cloud.*",
     "grpc.*",
     "ultralytics.*",
     "wandb_gql.*",
