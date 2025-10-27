@@ -115,10 +115,13 @@ func (h *HistoryReader) GetHistorySteps(
 			float64(maxStep),
 			false,
 		)
+
+		selectAllColumns := len(h.keys) == 0
 		selectedColumns, err := iterator.SelectColumns(
 			iterator.StepKey,
 			h.keys,
 			parquetFile.ParquetReader().MetaData().Schema,
+			selectAllColumns,
 		)
 		if err != nil {
 			return nil, err
