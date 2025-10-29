@@ -7,7 +7,7 @@ import re
 import time
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import urlparse
 
 from wandb import util
 from wandb._strutils import ensureprefix
@@ -18,6 +18,7 @@ from wandb.sdk.artifacts.artifact_manifest_entry import ArtifactManifestEntry
 from wandb.sdk.artifacts.storage_handler import DEFAULT_MAX_OBJECTS, StorageHandler
 from wandb.sdk.lib.hashutil import ETag
 from wandb.sdk.lib.paths import FilePathStr, StrPath, URIStr
+import boto3.s3
 
 if TYPE_CHECKING:
     from urllib.parse import ParseResult
@@ -75,13 +76,25 @@ class S3Handler(StorageHandler):
         return self._s3
 
     def _parse_uri(self, uri: str) -> tuple[str, str, str | None]:
-        url = urlparse(uri)
-        query = dict(parse_qsl(url.query))
-
-        bucket = url.netloc
-        key = url.path[1:]  # strip leading slash
-        version = query.get("versionId")
-
+        # Fast path to avoid urlparse overhead for common S3 URI patterns
+        scheme_split = uri.split("://", 1)
+        rest = scheme_split[1] if len(scheme_split) == 2 else uri
+        query_split = rest.split("?", 1)
+        path_part = query_split[0]
+        query_str = query_split[1] if len(query_split) == 2 else ""
+        netloc_end = path_part.find("/")
+        if netloc_end == -1:
+            bucket = path_part
+            key = ""
+        else:
+            bucket = path_part[:netloc_end]
+            key = path_part[netloc_end + 1 :]
+        version = None
+        if query_str and "versionId=" in query_str:
+            for kv in query_str.split("&"):
+                if kv.startswith("versionId="):
+                    version = kv[10:]  # length of 'versionId=' is 10
+                    break
         return bucket, key, version
 
     def load_path(
