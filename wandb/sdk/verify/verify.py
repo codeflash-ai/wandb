@@ -19,6 +19,14 @@ from wandb.sdk.lib import runid
 
 from ...apis.internal import Api
 
+_failed_style_cache = {}
+
+_api_hosts = (
+    "api.wandb.ai",
+    "http://api.wandb.ai",
+    "https://api.wandb.ai",
+)
+
 PROJECT_NAME = "verify"
 GET_RUN_MAX_TIME = 10
 MIN_RETRYS = 3
@@ -34,26 +42,24 @@ def nice_id(name):
 def print_results(
     failed_test_or_tests: Optional[Union[str, List[str]]], warning: bool
 ) -> None:
-    if warning:
-        color = "yellow"
-    else:
-        color = "red"
+    # Branch only once for color
+    color = "yellow" if warning else "red"
+
     if isinstance(failed_test_or_tests, str):
         print(RED_X)  # noqa: T201
-        print(click.style(failed_test_or_tests, fg=color, bold=True))  # noqa: T201
-    elif isinstance(failed_test_or_tests, list) and len(failed_test_or_tests) > 0:
+        print(_style_failed_string(failed_test_or_tests, color))  # noqa: T201
+    elif isinstance(failed_test_or_tests, list) and failed_test_or_tests:
         print(RED_X)  # noqa: T201
+        # Use helper and join via generator for memory efficiency
         print(  # noqa: T201
-            "\n".join(
-                [click.style(f, fg=color, bold=True) for f in failed_test_or_tests]
-            )
+            "\n".join(_style_failed_string(f, color) for f in failed_test_or_tests)
         )
     else:
         print(CHECKMARK)  # noqa: T201
 
 
 def check_host(host: str) -> bool:
-    if host in ("api.wandb.ai", "http://api.wandb.ai", "https://api.wandb.ai"):
+    if host in _api_hosts:
         print_results("Cannot run wandb verify against api.wandb.ai", False)
         return False
     return True
@@ -93,7 +99,9 @@ def check_secure_requests(url: str, test_url_string: str, failure_output: str) -
 
 
 def check_cors_configuration(url: str, origin: str) -> None:
-    print("Checking CORs configuration of the bucket".ljust(72, "."), end="")  # noqa: T201
+    print(
+        "Checking CORs configuration of the bucket".ljust(72, "."), end=""
+    )  # noqa: T201
     fail_string = None
     res_get = requests.options(
         url, headers={"Origin": origin, "Access-Control-Request-Method": "GET"}
@@ -313,7 +321,9 @@ def log_use_download_artifact(
 
 
 def check_artifacts() -> bool:
-    print("Checking artifact save and download workflows".ljust(72, "."), end="")  # noqa: T201
+    print(
+        "Checking artifact save and download workflows".ljust(72, "."), end=""
+    )  # noqa: T201
     failed_test_strings: List[str] = []
 
     # test checksum
@@ -466,7 +476,9 @@ def check_large_post() -> bool:
 
 
 def check_wandb_version(api: Api) -> None:
-    print("Checking wandb package version is up to date".ljust(72, "."), end="")  # noqa: T201
+    print(
+        "Checking wandb package version is up to date".ljust(72, "."), end=""
+    )  # noqa: T201
     _, server_info = api.viewer_server_info()
     fail_string = None
     warning = False
@@ -491,7 +503,9 @@ def check_wandb_version(api: Api) -> None:
 
 
 def check_sweeps(api: Api) -> bool:
-    print("Checking sweep creation and agent execution".ljust(72, "."), end="")  # noqa: T201
+    print(
+        "Checking sweep creation and agent execution".ljust(72, "."), end=""
+    )  # noqa: T201
     failed_test_strings: List[str] = []
 
     sweep_config = {
@@ -553,3 +567,13 @@ def retry_fn(fn: Callable) -> Any:
             time.sleep(1)
             continue
     return res
+
+
+def _style_failed_string(s: str, color: str) -> str:
+    # Use a cache to avoid duplicate click.style calls for identical strings
+    key = (s, color)
+    out = _failed_style_cache.get(key)
+    if out is None:
+        out = click.style(s, fg=color, bold=True)
+        _failed_style_cache[key] = out
+    return out
