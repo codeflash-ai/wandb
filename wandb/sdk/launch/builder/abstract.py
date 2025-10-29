@@ -13,6 +13,11 @@ from ..utils import (
     ELASTIC_CONTAINER_REGISTRY_URI_REGEX,
     GCP_ARTIFACT_REGISTRY_URI_REGEX,
 )
+from wandb.sdk.launch.registry.azure_container_registry import AzureContainerRegistry
+from wandb.sdk.launch.registry.elastic_container_registry import (
+    ElasticContainerRegistry,
+)
+from wandb.sdk.launch.registry.google_artifact_registry import GoogleArtifactRegistry
 
 if TYPE_CHECKING:
     from wandb.sdk.launch.agent.job_status_tracker import JobAndRunStatusTracker
@@ -133,24 +138,12 @@ def registry_from_uri(uri: str) -> AbstractRegistry:
         uri = uri[len("https://") :]
 
     if AZURE_CONTAINER_REGISTRY_URI_REGEX.match(uri) is not None:
-        from wandb.sdk.launch.registry.azure_container_registry import (
-            AzureContainerRegistry,
-        )
-
         return AzureContainerRegistry(uri=uri)
 
     elif GCP_ARTIFACT_REGISTRY_URI_REGEX.match(uri) is not None:
-        from wandb.sdk.launch.registry.google_artifact_registry import (
-            GoogleArtifactRegistry,
-        )
-
         return GoogleArtifactRegistry(uri=uri)
 
     elif ELASTIC_CONTAINER_REGISTRY_URI_REGEX.match(uri) is not None:
-        from wandb.sdk.launch.registry.elastic_container_registry import (
-            ElasticContainerRegistry,
-        )
-
         return ElasticContainerRegistry(uri=uri)
 
     return AnonynmousRegistry(uri=uri)
