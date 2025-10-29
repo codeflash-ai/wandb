@@ -164,7 +164,8 @@ class Sentry:
     @_safe_noop
     def start_session(self) -> None:
         """Start a new session."""
-        assert self.scope is not None
+        if self.scope is None:
+            return
         # get the current client and scope
         session = self.scope._session
 
@@ -175,7 +176,8 @@ class Sentry:
     @_safe_noop
     def end_session(self) -> None:
         """End the current session."""
-        assert self.scope is not None
+        if self.scope is None:
+            return
         # get the current client and scope
         client = self.scope.get_client()
         session = self.scope._session
@@ -187,7 +189,8 @@ class Sentry:
     @_safe_noop
     def mark_session(self, status: SessionStatus | None = None) -> None:
         """Mark the current session with a status."""
-        assert self.scope is not None
+        if self.scope is None:
+            return
         session = self.scope._session
 
         if session is not None:
@@ -206,7 +209,8 @@ class Sentry:
         all events sent from this thread. It also tries to start a session
         if one doesn't already exist for this thread.
         """
-        assert self.scope is not None
+        if self.scope is None:
+            return
         settings_tags = (
             "entity",
             "project",
