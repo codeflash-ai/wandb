@@ -37,4 +37,5 @@ def split_repo_name(repo_name: str) -> tuple[str, str]:
 
 
 def convert_to_hostname(url: str) -> str:
-    return url.replace("http://", "").replace("https://", "").split("/", 1)[0]
+    url = url.removeprefix("http://").removeprefix("https://")
+    return url.partition("/")[0]
