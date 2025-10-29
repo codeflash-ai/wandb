@@ -307,6 +307,10 @@ def attempt_kaggle_load_ipynb():
 
 class Notebook:
     def __init__(self, settings: wandb.Settings) -> None:
+        # Lazy import of IPython only when Notebook is instantiated
+        import IPython
+        import IPython.display
+
         self.outputs: dict[int, Any] = {}
         self.settings = settings
         self.shell = IPython.get_ipython()
@@ -352,28 +356,25 @@ class Notebook:
         if not self.settings.save_code:
             logger.info("not saving jupyter notebook")
             return False
-        ret = False
         try:
-            ret = self._save_ipynb()
+            return self._save_ipynb()
         except Exception:
             wandb.termerror("Failed to save notebook.")
             logger.exception("Problem saving notebook.")
-        return ret
+            return False
 
     def _save_ipynb(self) -> bool:
         relpath = self.settings.x_jupyter_path
-        logger.info("looking for notebook: %s", relpath)
+        tmp_code_dir = self.settings._tmp_code_dir
         if relpath:
             if os.path.exists(relpath):
                 shutil.copy(
                     relpath,
-                    os.path.join(
-                        self.settings._tmp_code_dir, os.path.basename(relpath)
-                    ),
+                    os.path.join(tmp_code_dir, os.path.basename(relpath)),
                 )
                 return True
 
-        # TODO: likely only save if the code has changed
+        # Only attempt to load Colab IPYNB if local file doesn't exist
         colab_ipynb = attempt_colab_load_ipynb()
         if colab_ipynb:
             try:
@@ -387,7 +388,7 @@ class Notebook:
                 nb_name += ".ipynb"
             with open(
                 os.path.join(
-                    self.settings._tmp_code_dir,
+                    tmp_code_dir,
                     nb_name,
                 ),
                 "w",
@@ -397,16 +398,16 @@ class Notebook:
             return True
 
         kaggle_ipynb = attempt_kaggle_load_ipynb()
-        if kaggle_ipynb and len(kaggle_ipynb["cells"]) > 0:
-            with open(
-                os.path.join(
-                    self.settings._tmp_code_dir, kaggle_ipynb["metadata"]["name"]
-                ),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                f.write(json.dumps(kaggle_ipynb))
-            return True
+        if kaggle_ipynb:
+            cells = kaggle_ipynb.get("cells")
+            if cells and len(cells) > 0:
+                with open(
+                    os.path.join(tmp_code_dir, kaggle_ipynb["metadata"]["name"]),
+                    "w",
+                    encoding="utf-8",
+                ) as f:
+                    f.write(json.dumps(kaggle_ipynb))
+                return True
 
         return False
 
