@@ -70,11 +70,11 @@ def ensure_registry_prefix_on_names(query: Any, in_name: bool = False) -> Any:
 
     EX: {"name": "model"} -> {"name": "wandb-registry-model"}
     """
-    if isinstance((txt := query), str):
-        return ensureprefix(txt, REGISTRY_PREFIX) if in_name else txt
-    if isinstance((dct := query), dict):
+    if isinstance(query, str):
+        return ensureprefix(query, REGISTRY_PREFIX) if in_name else query
+    if isinstance(query, dict):
         new_dict = {}
-        for key, obj in dct.items():
+        for key, obj in query.items():
             if key == "$regex":
                 # For regex operator, we skip transformation of its value.
                 new_dict[key] = obj
@@ -84,8 +84,11 @@ def ensure_registry_prefix_on_names(query: Any, in_name: bool = False) -> Any:
                 # For any other key, propagate the in_name and skip_transform flags as-is.
                 new_dict[key] = ensure_registry_prefix_on_names(obj, in_name=in_name)
         return new_dict
-    if isinstance((seq := query), (list, tuple)):
-        return list(map(partial(ensure_registry_prefix_on_names, in_name=in_name), seq))
+    if isinstance(query, (list, tuple)):
+        return [
+            ensure_registry_prefix_on_names(element, in_name=in_name)
+            for element in query
+        ]
     return query
 
 

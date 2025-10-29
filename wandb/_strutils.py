@@ -23,7 +23,7 @@ def removesuffix(s: str, suffix: str) -> str:
 
 def ensureprefix(s: str, prefix: str) -> str:
     """Ensures the string has the given prefix prepended."""
-    return s if s.startswith(prefix) else f"{prefix}{s}"
+    return s if s.startswith(prefix) else prefix + s
 
 
 def ensuresuffix(s: str, suffix: str) -> str:
