@@ -108,13 +108,16 @@ def _is_preempted(status: "V1PodStatus") -> bool:
 
 def _is_container_creating(status: "V1PodStatus") -> bool:
     """Check if this pod has started creating containers."""
-    for container_status in status.container_statuses or []:
-        if (
-            container_status.state
-            and container_status.state.waiting
-            and container_status.state.waiting.reason == "ContainerCreating"
-        ):
-            return True
+    container_statuses = status.container_statuses
+    if not container_statuses:
+        return False
+
+    for container_status in container_statuses:
+        state = container_status.state
+        if state:
+            waiting = state.waiting
+            if waiting and waiting.reason == "ContainerCreating":
+                return True
     return False
 
 
