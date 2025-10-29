@@ -7,10 +7,9 @@ import re
 import time
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import urlsplit, parse_qsl, urlparse
 
 from wandb import util
-from wandb._strutils import ensureprefix
 from wandb.errors import CommError
 from wandb.errors.term import termlog
 from wandb.sdk.artifacts.artifact_file_cache import get_artifact_file_cache
@@ -323,20 +322,24 @@ class S3Handler(StorageHandler):
     )
 
     def _is_coreweave_endpoint(self, endpoint_url: str) -> bool:
-        if not (url := endpoint_url.strip().rstrip("/")):
+        url = endpoint_url.strip().rstrip("/")
+        if not url:
             return False
 
-        # Only http://cwlota.com is supported using HTTP
         if url == "http://cwlota.com":
             return True
 
-        # Enforce HTTPS otherwise
-        https_url = ensureprefix(url, "https://")
-        netloc = urlparse(https_url).netloc
-        return bool(
-            # Match for https://cwobject.com
-            (netloc == "cwobject.com")
-            or
-            # Check for legacy endpoints
-            self._CW_LEGACY_NETLOC_REGEX.fullmatch(netloc)
-        )
+        # Only prepend prefix if not present
+        if url.startswith("https://"):
+            https_url = url
+        else:
+            https_url = f"https://{url}"
+
+        # Fast path for exact netloc match
+        # urlsplit is faster than urlparse for netloc extraction
+        netloc = urlsplit(https_url).netloc
+
+        # Localize regex for minor perf (attribute access cost)
+        legacy_regex = self._CW_LEGACY_NETLOC_REGEX
+
+        return netloc == "cwobject.com" or legacy_regex.fullmatch(netloc) is not None
