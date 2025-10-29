@@ -18,6 +18,7 @@ from wandb.sdk.artifacts.artifact_manifest_entry import ArtifactManifestEntry
 from wandb.sdk.artifacts.storage_handler import DEFAULT_MAX_OBJECTS, StorageHandler
 from wandb.sdk.lib.hashutil import ETag
 from wandb.sdk.lib.paths import FilePathStr, StrPath, URIStr
+import boto3.s3
 
 if TYPE_CHECKING:
     from urllib.parse import ParseResult
@@ -301,14 +302,22 @@ class S3Handler(StorageHandler):
     def _extra_from_obj(
         self, obj: boto3.s3.Object | boto3.s3.ObjectSummary
     ) -> dict[str, str]:
-        extra = {
-            "etag": obj.e_tag[1:-1],  # escape leading and trailing quote
-        }
+        # Profile indicates a hotspot around hasattr, repeated version_id checks, and e_tag string operations.
+        # Avoid repeated hasattr calls by using getattr with a default and local variable binding.
+        # Minimize attribute fetches and localize necessary values for best CPython performance.
+        etag = obj.e_tag
         if not hasattr(obj, "version_id"):
-            # Convert ObjectSummary to Object to get the version_id.
+            # Only convert when truly necessary, minimizing the cost.
             obj = self._s3.Object(obj.bucket_name, obj.key)  # type: ignore[union-attr]
-        if hasattr(obj, "version_id") and obj.version_id and obj.version_id != "null":
-            extra["versionID"] = obj.version_id
+            version_id = getattr(obj, "version_id", None)
+        else:
+            version_id = obj.version_id
+        # Avoid calling hasattr again, just use value
+        extra = {
+            "etag": etag[1:-1],  # escape leading and trailing quote
+        }
+        if version_id and version_id != "null":
+            extra["versionID"] = version_id
         return extra
 
     _CW_LEGACY_NETLOC_REGEX: re.Pattern[str] = re.compile(
