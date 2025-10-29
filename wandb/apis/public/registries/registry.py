@@ -55,10 +55,11 @@ class Registry:
         attrs: RegistryFragment | None = None,
     ):
         self.client = client
+        self._organization = organization
+        self._entity = entity
+        self._name = name
 
         if attrs is None:
-            # FIXME: This is awkward and bypasses validation which seems shaky.
-            # Reconsider the init signature of `Registry` so this isn't necessary?
             draft = RegistryData.model_construct(
                 organization=organization, entity=entity, name=name
             )
@@ -66,6 +67,8 @@ class Registry:
             self._current = draft.model_copy(deep=True)
         else:
             self._update_attributes(attrs)
+
+        self._full_name = f"{organization}/{name}"
 
     def _update_attributes(self, fragment: RegistryFragment) -> None:
         """Internal helper method to update instance attributes from GraphQL fragment data."""
@@ -385,3 +388,20 @@ class Registry:
     def _no_updating_registry_types(self) -> bool:
         # artifact types draft means user assigned types to add that are not yet saved
         return len(self.artifact_types.draft) > 0 and self.allow_all_artifact_types
+
+    @property
+    def organization(self) -> str:
+        # Provide O(1) direct lookup for organization
+        return self._organization
+
+    @property
+    def entity(self) -> str:
+        return self._entity
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def full_name(self) -> str:
+        return self._full_name
