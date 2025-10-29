@@ -188,7 +188,10 @@ def termwarn(
 
     The arguments are the same as for `termlog()`.
     """
-    string = "\n".join([f"{WARN_STRING} {s}" for s in string.split("\n")])
+    if "\n" not in string:
+        string = f"{WARN_STRING} {string}"
+    else:
+        string = "\n".join(f"{WARN_STRING} {s}" for s in string.split("\n"))
     _log(
         string,
         newline=newline,
