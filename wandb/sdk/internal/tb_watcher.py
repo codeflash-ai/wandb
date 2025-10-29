@@ -505,9 +505,12 @@ class TBHistory:
 
     def _track_history_dict(self, d: "HistoryDict") -> "HistoryDict":
         e = {}
-        for k in d.keys():
-            e[k] = d[k]
-            self._step_size += sys.getsizeof(e[k])
+        getsizeof = sys.getsizeof
+        step_size = self._step_size
+        for k, v in d.items():
+            e[k] = v
+            step_size += getsizeof(v)
+        self._step_size = step_size
         return e
 
     def _row_update(self, d: "HistoryDict") -> None:
