@@ -72,7 +72,8 @@ def is_tfevents_file_created_by(
     """
     if not path:
         raise ValueError("Path must be a nonempty string")
-    basename = os.path.basename(path)
+    sep_idx = path.rfind(os.sep)
+    basename = path[sep_idx + 1 :] if sep_idx != -1 else path
     if basename.endswith((".profile-empty", ".sagemaker-uploaded")):
         return False
     fname_components = basename.split(".")
@@ -82,13 +83,15 @@ def is_tfevents_file_created_by(
         return False
     # check the hostname, which may have dots
     if hostname is not None:
-        for i, part in enumerate(hostname.split(".")):
-            try:
-                fname_component_part = fname_components[tfevents_idx + 2 + i]
-            except IndexError:
-                return False
-            if part != fname_component_part:
-                return False
+        hostname_components = hostname.split(".")
+        needed = tfevents_idx + 2 + len(hostname_components)
+        if len(fname_components) < needed:
+            return False
+        fname_parts = fname_components[
+            tfevents_idx + 2 : tfevents_idx + 2 + len(hostname_components)
+        ]
+        if fname_parts != hostname_components:
+            return False
     if start_time is not None:
         try:
             created_time = int(fname_components[tfevents_idx + 1])
