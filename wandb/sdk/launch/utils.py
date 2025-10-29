@@ -42,6 +42,8 @@ FAILED_PACKAGES_REGEX = re.compile(
 if TYPE_CHECKING:  # pragma: no cover
     from wandb.sdk.launch.agent.job_status_tracker import JobAndRunStatusTracker
 
+_DNS_SAFE_RE = re.compile(r"[^a-z\.\-]")
+
 
 # TODO: this should be restricted to just Git repos and not S3 and stuff like that
 _GIT_URI_REGEX = re.compile(
@@ -390,9 +392,9 @@ def diff_pip_requirements(req_1: List[str], req_2: List[str]) -> Dict[str, str]:
             else:
                 raise ValueError(f"Unable to parse pip requirements file line: {line}")
             if _name is not None:
-                assert re.match(_VALID_PIP_PACKAGE_REGEX, _name), (
-                    f"Invalid pip package name {_name}"
-                )
+                assert re.match(
+                    _VALID_PIP_PACKAGE_REGEX, _name
+                ), f"Invalid pip package name {_name}"
                 d[_name] = _version
         return d
 
@@ -603,7 +605,7 @@ def check_logged_in(api: Api) -> bool:
 
 def make_name_dns_safe(name: str) -> str:
     resp = name.replace("_", "-").lower()
-    resp = re.sub(r"[^a-z\.\-]", "", resp)
+    resp = _DNS_SAFE_RE.sub("", resp)
     # Actual length limit is 253, but we want to leave room for the generated suffix
     resp = resp[:200]
     return resp
