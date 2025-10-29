@@ -26,9 +26,10 @@ class StoragePolicy(ABC):
 
     @classmethod
     def lookup_by_name(cls, name: str) -> type[StoragePolicy]:
-        if policy := _POLICY_REGISTRY.get(name):
-            return policy
-        raise ValueError(f"Failed to find storage policy {name!r}")
+        try:
+            return _POLICY_REGISTRY[name]
+        except KeyError:
+            raise ValueError(f"Failed to find storage policy {name!r}")
 
     @classmethod
     @abstractmethod
