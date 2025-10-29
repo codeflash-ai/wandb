@@ -390,9 +390,9 @@ def diff_pip_requirements(req_1: List[str], req_2: List[str]) -> Dict[str, str]:
             else:
                 raise ValueError(f"Unable to parse pip requirements file line: {line}")
             if _name is not None:
-                assert re.match(_VALID_PIP_PACKAGE_REGEX, _name), (
-                    f"Invalid pip package name {_name}"
-                )
+                assert re.match(
+                    _VALID_PIP_PACKAGE_REGEX, _name
+                ), f"Invalid pip package name {_name}"
                 d[_name] = _version
         return d
 
@@ -514,12 +514,14 @@ def to_camel_case(maybe_snake_str: str) -> str:
 def validate_build_and_registry_configs(
     build_config: Dict[str, Any], registry_config: Dict[str, Any]
 ) -> None:
-    build_config_credentials = build_config.get("credentials", {})
-    registry_config_credentials = registry_config.get("credentials", {})
+    # Localize get calls to avoid repeated dictionary lookups
+    build_credentials = build_config.get("credentials")
+    registry_credentials = registry_config.get("credentials")
+    # Fastest short-circuiting logic to catch mismatches
     if (
-        build_config_credentials
-        and registry_config_credentials
-        and build_config_credentials != registry_config_credentials
+        build_credentials is not None
+        and registry_credentials is not None
+        and build_credentials != registry_credentials
     ):
         raise LaunchError("registry and build config credential mismatch")
 
@@ -570,16 +572,24 @@ def resolve_build_and_registry_config(
     build_config: Optional[Dict[str, Any]],
     registry_config: Optional[Dict[str, Any]],
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    resolved_build_config: Dict[str, Any] = {}
-    if build_config is None and default_launch_config is not None:
-        resolved_build_config = default_launch_config.get("builder", {})
-    elif build_config is not None:
-        resolved_build_config = build_config
-    resolved_registry_config: Dict[str, Any] = {}
-    if registry_config is None and default_launch_config is not None:
-        resolved_registry_config = default_launch_config.get("registry", {})
-    elif registry_config is not None:
-        resolved_registry_config = registry_config
+    # Avoid excessive intermediate assignments, directly set config
+    if build_config is not None:
+        resolved_build_config: Dict[str, Any] = build_config
+    elif default_launch_config is not None:
+        resolved_build_config: Dict[str, Any] = default_launch_config.get("builder", {})
+    else:
+        resolved_build_config: Dict[str, Any] = {}
+
+    if registry_config is not None:
+        resolved_registry_config: Dict[str, Any] = registry_config
+    elif default_launch_config is not None:
+        resolved_registry_config: Dict[str, Any] = default_launch_config.get(
+            "registry", {}
+        )
+    else:
+        resolved_registry_config: Dict[str, Any] = {}
+
+    # Let short-circuiting happen in validation
     validate_build_and_registry_configs(resolved_build_config, resolved_registry_config)
     return resolved_build_config, resolved_registry_config
 
