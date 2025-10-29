@@ -102,11 +102,24 @@ class LaunchProject:
         self.target_entity = target_entity
         self.target_project = target_project.lower()
         self.name = name  # TODO: replace with run_id
-        # the builder key can be passed in through the resource args
-        # but these resource_args are then passed to the appropriate
-        # runner, so we need to pop the builder key out
-        resource_args_copy = deepcopy(resource_args)
-        resource_args_build = resource_args_copy.get(resource, {}).pop("builder", {})
+        # extract builder argument from resource_args (shallow copy for the relevant part)
+        resource_args_copy = {}
+        resource_args_build = {}
+        if resource in resource_args:
+            resource_args_resource = resource_args[resource]
+            if isinstance(resource_args_resource, dict):
+                # create a shallow copy except pop "builder"
+                resource_args_resource_copy = resource_args_resource.copy()
+                resource_args_build = resource_args_resource_copy.pop("builder", {})
+                resource_args_copy[resource] = resource_args_resource_copy
+            else:
+                # preserve as is if not a dict (follow original behavior)
+                resource_args_copy[resource] = resource_args_resource
+        # include all other keys unchanged (reference, not copy)
+        for k, v in resource_args.items():
+            if k != resource:
+                resource_args_copy[k] = v
+
         self.resource = resource
         self.resource_args = resource_args_copy
         self.sweep_id = sweep_id
@@ -115,14 +128,25 @@ class LaunchProject:
         self._job_dockerfile: Optional[str] = None
         self._job_build_context: Optional[str] = None
         self._job_base_image: Optional[str] = None
-        self.accelerator_base_image: Optional[str] = resource_args_build.get(
-            "accelerator", {}
-        ).get("base_image") or resource_args_build.get("cuda", {}).get("base_image")
-        self.docker_image: Optional[str] = docker_config.get(
-            "docker_image"
-        ) or launch_spec.get("image_uri")  # type: ignore [assignment]
+
+        # Accelerator base image, optimize for speed by avoiding unnecessary dict creation
+        base_img = None
+        acc = resource_args_build.get("accelerator")
+        if isinstance(acc, dict):
+            base_img = acc.get("base_image")
+        if base_img is None:
+            cuda = resource_args_build.get("cuda")
+            if isinstance(cuda, dict):
+                base_img = cuda.get("base_image")
+        self.accelerator_base_image: Optional[str] = base_img
+
+        # Prefer docker_config's docker_image first, else launch_spec's image_uri
+        docker_image = docker_config.get("docker_image")
+        if docker_image is None:
+            docker_image = launch_spec.get("image_uri")
+        self.docker_image: Optional[str] = docker_image  # type: ignore[assignment]
         self.docker_user_id = docker_config.get("user_id", 1000)
-        self._entry_point: Optional[EntryPoint] = (
+        self._entry_point: Optional["EntryPoint"] = (
             None  # todo: keep multiple entrypoint support?
         )
         self.init_overrides(overrides)
@@ -370,9 +394,9 @@ class LaunchProject:
 
     def set_job_entry_point(self, command: List[str]) -> "EntryPoint":
         """Set job entrypoint for the project."""
-        assert self._entry_point is None, (
-            "Cannot set entry point twice. Use LaunchProject.override_entrypoint"
-        )
+        assert (
+            self._entry_point is None
+        ), "Cannot set entry point twice. Use LaunchProject.override_entrypoint"
         new_entrypoint = EntryPoint(name=command[-1], command=command)
         self._entry_point = new_entrypoint
         return new_entrypoint
