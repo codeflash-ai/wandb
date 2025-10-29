@@ -11,12 +11,23 @@ def resolve_repository_name(repo_name: str) -> tuple[str, str]:
             f"Repository name cannot contain a scheme ({repo_name})"
         )
 
-    index_name, remote_name = split_repo_name(repo_name)
+    parts = repo_name.split("/", 1)
+    if len(parts) == 1 or (
+        "." not in parts[0] and ":" not in parts[0] and parts[0] != "localhost"
+    ):
+        index_name, remote_name = "docker.io", repo_name
+    else:
+        index_name, remote_name = parts[0], parts[1]
+
     if index_name[0] == "-" or index_name[-1] == "-":
         raise InvalidRepositoryError(
             f"Invalid index name ({index_name}). Cannot begin or end with a hyphen."
         )
-    return resolve_index_name(index_name), remote_name
+
+    index_name = convert_to_hostname(index_name)
+    if index_name == "index.docker.io":
+        index_name = "docker.io"
+    return index_name, remote_name
 
 
 def resolve_index_name(index_name: str) -> str:
