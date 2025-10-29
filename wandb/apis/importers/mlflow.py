@@ -22,6 +22,7 @@ class MlflowRun:
     def __init__(self, run, mlflow_client):
         self.run = run
         self.mlflow_client: mlflow.MlflowClient = mlflow_client
+        self._experiment_id = run.info.experiment_id
 
     def run_id(self) -> str:
         return self.run.info.run_id
@@ -56,7 +57,7 @@ class MlflowRun:
 
     def run_group(self) -> Optional[str]:
         # this is nesting?  Parent at `run.info.tags.get("mlflow.parentRunId")`
-        return f"Experiment {self.run.info.experiment_id}"
+        return f"Experiment {self._experiment_id}"
 
     def job_type(self) -> Optional[str]:
         # Is this the right approach?
