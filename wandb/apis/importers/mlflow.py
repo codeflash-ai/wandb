@@ -22,12 +22,23 @@ class MlflowRun:
     def __init__(self, run, mlflow_client):
         self.run = run
         self.mlflow_client: mlflow.MlflowClient = mlflow_client
+        # Cache user_id for faster access in entity()
+        try:
+            self._user_id = run.info.user_id
+        except AttributeError:
+            # Ensure same exceptions are raised if run.info or user_id is missing
+            self._user_id = None
 
     def run_id(self) -> str:
         return self.run.info.run_id
 
     def entity(self) -> str:
-        return self.run.info.user_id
+        # Perf: Access cached user_id rather than nested attribute traversal
+        # Behavior: If user_id does not exist, same exception will be raised as before
+        if self._user_id is None:
+            # This will raise an AttributeError like the original code
+            return self.run.info.user_id
+        return self._user_id
 
     def project(self) -> str:
         return "imported-from-mlflow"
