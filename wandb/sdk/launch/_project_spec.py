@@ -120,7 +120,9 @@ class LaunchProject:
         ).get("base_image") or resource_args_build.get("cuda", {}).get("base_image")
         self.docker_image: Optional[str] = docker_config.get(
             "docker_image"
-        ) or launch_spec.get("image_uri")  # type: ignore [assignment]
+        ) or launch_spec.get(
+            "image_uri"
+        )  # type: ignore [assignment]
         self.docker_user_id = docker_config.get("user_id", 1000)
         self._entry_point: Optional[EntryPoint] = (
             None  # todo: keep multiple entrypoint support?
@@ -370,9 +372,9 @@ class LaunchProject:
 
     def set_job_entry_point(self, command: List[str]) -> "EntryPoint":
         """Set job entrypoint for the project."""
-        assert self._entry_point is None, (
-            "Cannot set entry point twice. Use LaunchProject.override_entrypoint"
-        )
+        assert (
+            self._entry_point is None
+        ), "Cannot set entry point twice. Use LaunchProject.override_entrypoint"
         new_entrypoint = EntryPoint(name=command[-1], command=command)
         self._entry_point = new_entrypoint
         return new_entrypoint
@@ -535,15 +537,16 @@ def _inject_wandb_config_env_vars(
     config: Dict[str, Any], env_dict: Dict[str, Any], maximum_env_length: int
 ) -> None:
     str_config = json.dumps(config)
-    if len(str_config) <= maximum_env_length:
+    str_config_len = len(str_config)
+    if str_config_len <= maximum_env_length:
         env_dict["WANDB_CONFIG"] = str_config
         return
 
-    chunks = [
-        str_config[i : i + maximum_env_length]
-        for i in range(0, len(str_config), maximum_env_length)
-    ]
-    config_chunks_dict = {f"WANDB_CONFIG_{i}": chunk for i, chunk in enumerate(chunks)}
+    config_chunks_dict = {}
+    for i, start in enumerate(range(0, str_config_len, maximum_env_length)):
+        config_chunks_dict[f"WANDB_CONFIG_{i}"] = str_config[
+            start : start + maximum_env_length
+        ]
     env_dict.update(config_chunks_dict)
 
 
