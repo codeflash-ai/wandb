@@ -42,6 +42,10 @@ FAILED_PACKAGES_REGEX = re.compile(
 if TYPE_CHECKING:  # pragma: no cover
     from wandb.sdk.launch.agent.job_status_tracker import JobAndRunStatusTracker
 
+_INVALID_CHARS = re.compile(r"[^a-z0-9\-]")
+
+_CONSEC_DASH = re.compile(r"-+")
+
 
 # TODO: this should be restricted to just Git repos and not S3 and stuff like that
 _GIT_URI_REGEX = re.compile(
@@ -390,9 +394,9 @@ def diff_pip_requirements(req_1: List[str], req_2: List[str]) -> Dict[str, str]:
             else:
                 raise ValueError(f"Unable to parse pip requirements file line: {line}")
             if _name is not None:
-                assert re.match(_VALID_PIP_PACKAGE_REGEX, _name), (
-                    f"Invalid pip package name {_name}"
-                )
+                assert re.match(
+                    _VALID_PIP_PACKAGE_REGEX, _name
+                ), f"Invalid pip package name {_name}"
                 d[_name] = _version
         return d
 
@@ -623,9 +627,9 @@ def make_k8s_label_safe(value: str) -> str:
     # Normalize common separators first
     safe = value.replace("_", "-").lower()
     # Remove any invalid characters
-    safe = re.sub(r"[^a-z0-9\-]", "", safe)
+    safe = _INVALID_CHARS.sub("", safe)
     # Collapse consecutive '-'
-    safe = re.sub(r"-+", "-", safe)
+    safe = _CONSEC_DASH.sub("-", safe)
     # Trim to 63 and strip leading/trailing '-'
     safe = safe[:63].strip("-")
 
