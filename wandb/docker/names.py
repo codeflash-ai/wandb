@@ -27,13 +27,12 @@ def resolve_index_name(index_name: str) -> str:
 
 
 def split_repo_name(repo_name: str) -> tuple[str, str]:
-    parts = repo_name.split("/", 1)
-    if len(parts) == 1 or (
-        "." not in parts[0] and ":" not in parts[0] and parts[0] != "localhost"
-    ):
+    # Use partition which avoids a list allocation and is faster than split
+    head, sep, tail = repo_name.partition("/")
+    if not sep or ("." not in head and ":" not in head and head != "localhost"):
         # This is a docker index repo (ex: username/foobar or ubuntu)
         return "docker.io", repo_name
-    return parts[0], parts[1]
+    return head, tail
 
 
 def convert_to_hostname(url: str) -> str:
