@@ -1,7 +1,7 @@
 import logging
 import sys
 import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
@@ -57,11 +57,15 @@ def parallelize(
             if raise_on_error:
                 raise
 
-    results = []
+    items = list(iterable)
+    results = [None] * len(items)
     with ThreadPoolExecutor(max_workers) as exc:
-        futures = {exc.submit(safe_func, x, *args, **kwargs): x for x in iterable}
-        for future in as_completed(futures):
-            results.append(future.result())
+        futures = {
+            exc.submit(safe_func, x, *args, **kwargs): i for i, x in enumerate(items)
+        }
+        for future in futures:
+            idx = futures[future]
+            results[idx] = future.result()
     return results
 
 
