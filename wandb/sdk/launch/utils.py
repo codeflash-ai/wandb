@@ -390,9 +390,9 @@ def diff_pip_requirements(req_1: List[str], req_2: List[str]) -> Dict[str, str]:
             else:
                 raise ValueError(f"Unable to parse pip requirements file line: {line}")
             if _name is not None:
-                assert re.match(_VALID_PIP_PACKAGE_REGEX, _name), (
-                    f"Invalid pip package name {_name}"
-                )
+                assert re.match(
+                    _VALID_PIP_PACKAGE_REGEX, _name
+                ), f"Invalid pip package name {_name}"
                 d[_name] = _version
         return d
 
@@ -508,7 +508,7 @@ def to_camel_case(maybe_snake_str: str) -> str:
     if "_" not in maybe_snake_str:
         return maybe_snake_str
     components = maybe_snake_str.split("_")
-    return "".join(x.title() if x else "_" for x in components)
+    return "".join([x.title() if x else "_" for x in components])
 
 
 def validate_build_and_registry_configs(
