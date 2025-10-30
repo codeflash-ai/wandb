@@ -71,6 +71,8 @@ if TYPE_CHECKING:
     import wandb.sdk.wandb_settings
     from wandb.sdk.artifacts.artifact import Artifact
 
+_imported_modules = {}
+
 CheckRetryFnType = Callable[[Exception], Union[bool, timedelta]]
 T = TypeVar("T")
 
@@ -239,12 +241,17 @@ def get_module(
     :param (bool) lazy: If True, return a lazy loader for the module.
     :return: (module|None) If import succeeds, the module will be returned.
     """
+    if name in _imported_modules:
+        return _imported_modules[name]
     if name not in _not_importable:
         try:
+            module = None
             if not lazy:
-                return import_module(name)
+                module = import_module(name)
             else:
-                return import_module_lazy(name)
+                module = import_module_lazy(name)
+            _imported_modules[name] = module
+            return module
         except Exception:
             _not_importable.add(name)
             msg = f"Error importing optional module {name}"
