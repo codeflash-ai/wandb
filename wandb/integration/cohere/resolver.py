@@ -222,17 +222,19 @@ class CohereRequestResponseResolver:
     # we need different logic to process them.
 
     def _resolve_generate_response(self, response: Response) -> List[Dict[str, Any]]:
+        wandb_Html = wandb.Html
         return_list = []
+        append = return_list.append
+
         for _response in response:
-            # Built in Cohere.*.Generations function to color token_likelihoods and return a dict of response data
             _response_dict = _response._visualize_helper()
-            try:
-                _response_dict["token_likelihoods"] = wandb.Html(
-                    _response_dict["token_likelihoods"]
-                )
-            except (KeyError, ValueError):
-                pass
-            return_list.append(_response_dict)
+            tl_value = _response_dict.get("token_likelihoods")
+            if tl_value is not None:
+                try:
+                    _response_dict["token_likelihoods"] = wandb_Html(tl_value)
+                except ValueError:
+                    pass
+            append(_response_dict)
 
         return return_list
 
