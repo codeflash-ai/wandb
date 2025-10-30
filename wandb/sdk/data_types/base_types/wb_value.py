@@ -218,52 +218,57 @@ class WBValue:
     def _set_artifact_source(
         self, artifact: "Artifact", name: Optional[str] = None
     ) -> None:
-        assert self._artifact_source is None, (
-            f"Cannot update artifact_source. Existing source: {self._artifact_source.artifact}/{self._artifact_source.name}"
-        )
+        assert (
+            self._artifact_source is None
+        ), f"Cannot update artifact_source. Existing source: {self._artifact_source.artifact}/{self._artifact_source.name}"
         self._artifact_source = _WBValueArtifactSource(artifact, name)
 
     def _set_artifact_target(
         self, artifact: "Artifact", name: Optional[str] = None
     ) -> None:
-        assert self._artifact_target is None, (
-            f"Cannot update artifact_target. Existing target: {self._artifact_target.artifact}/{self._artifact_target.name}"
-        )
+        assert (
+            self._artifact_target is None
+        ), f"Cannot update artifact_target. Existing target: {self._artifact_target.artifact}/{self._artifact_target.name}"
         self._artifact_target = _WBValueArtifactTarget(artifact, name)
 
     def _get_artifact_entry_ref_url(self) -> Optional[str]:
         # If the object is coming from another artifact
-        if self._artifact_source and self._artifact_source.name:
-            ref_entry = self._artifact_source.artifact.get_entry(
-                type(self).with_suffix(self._artifact_source.name)
+        artifact_source = self._artifact_source
+        artifact_target = self._artifact_target
+        cls = type(self)
+        if artifact_source is not None and getattr(artifact_source, "name", None):
+            ref_entry = artifact_source.artifact.get_entry(
+                cls.with_suffix(artifact_source.name)
             )
             return str(ref_entry.ref_url())
-        # Else, if the object is destined for another artifact and we support client IDs
-        elif (
-            self._artifact_target
-            and self._artifact_target.name
-            and self._artifact_target.artifact._client_id is not None
-            and self._artifact_target.artifact._final
-            and _server_accepts_client_ids()
-        ):
-            return f"wandb-client-artifact://{self._artifact_target.artifact._client_id}/{type(self).with_suffix(self._artifact_target.name)}"
-        # Else if we do not support client IDs, but online, then block on upload
-        # Note: this is old behavior just to stay backwards compatible
-        # with older server versions. This code path should be removed
-        # once those versions are no longer supported. This path uses a .wait
-        # which blocks the user process on artifact upload.
-        elif (
-            self._artifact_target
-            and self._artifact_target.name
-            and self._artifact_target.artifact._is_draft_save_started()
-            and not _is_maybe_offline()
-            and not _server_accepts_client_ids()
-        ):
-            self._artifact_target.artifact.wait()
-            ref_entry = self._artifact_target.artifact.get_entry(
-                type(self).with_suffix(self._artifact_target.name)
-            )
-            return str(ref_entry.ref_url())
+        # Cache expensive calls and make checks in order of least cost
+        server_accepts_client_ids = None  # Lazy so only called if needed
+        if artifact_target is not None and getattr(artifact_target, "name", None):
+            artifact_obj = artifact_target.artifact
+            client_id = getattr(artifact_obj, "_client_id", None)
+            final = getattr(artifact_obj, "_final", False)
+            if client_id is not None and final:
+                # Only now query the server version support
+                if server_accepts_client_ids is None:
+                    server_accepts_client_ids = _server_accepts_client_ids()
+                if server_accepts_client_ids:
+                    return (
+                        f"wandb-client-artifact://{client_id}/"
+                        f"{cls.with_suffix(artifact_target.name)}"
+                    )
+            # Legacy code path: block on upload if not offline and server doesn't support client ids
+            if (
+                getattr(artifact_obj, "_is_draft_save_started", lambda: False)()
+                and not _is_maybe_offline()
+            ):
+                if server_accepts_client_ids is None:
+                    server_accepts_client_ids = _server_accepts_client_ids()
+                if not server_accepts_client_ids:
+                    artifact_obj.wait()
+                    ref_entry = artifact_obj.get_entry(
+                        cls.with_suffix(artifact_target.name)
+                    )
+                    return str(ref_entry.ref_url())
         return None
 
     def _get_artifact_entry_latest_ref_url(self) -> Optional[str]:
