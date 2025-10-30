@@ -28,6 +28,9 @@ from .templates.dockerfile import (
     PYTHON_SETUP_TEMPLATE,
     USER_CREATE_TEMPLATE,
 )
+import getpass
+
+_USERNAME = getpass.getuser()
 
 _logger = logging.getLogger(__name__)
 
@@ -127,9 +130,7 @@ def image_tag_from_dockerfile_and_source(
 
 
 def get_docker_user(launch_project: LaunchProject, runner_type: str) -> Tuple[str, int]:
-    import getpass
-
-    username = getpass.getuser()
+    username = _USERNAME
 
     if runner_type == "sagemaker" and not launch_project.docker_image:
         # unless user has provided their own image, sagemaker must run as root but keep the name for workdir etc
