@@ -1124,8 +1124,9 @@ class PartitionedTable(Media):
         entries = source_artifact.manifest.get_entries_in_directory(
             json_obj["parts_path"]
         )
-        for entry in entries:
-            instance._add_part_entry(entry, source_artifact)
+        instance._loaded_part_entries = {
+            entry.path: _PartitionTablePartEntry(entry, source_artifact) for entry in entries
+        }
         return instance
 
     def iterrows(self):
