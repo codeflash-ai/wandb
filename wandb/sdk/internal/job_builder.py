@@ -185,6 +185,10 @@ class JobBuilder:
         self._partial = False
         self._services = {}
 
+        # Cache basename of sys.executable on instance for reuse
+        # Since all _get_entrypoint() will always use same value per process/run
+        self._sys_executable_basename = os.path.basename(sys.executable)
+
     def set_config(self, config: Dict[str, Any]) -> None:
         self._config = config
 
@@ -380,11 +384,11 @@ class JobBuilder:
         # should already be in metadata from create_job
         if self._partial:
             if metadata.get("entrypoint"):
-                entrypoint: List[str] = metadata["entrypoint"]
-                return entrypoint
+                # Keeps variable assignment and avoids additional dictionary lookup.
+                return metadata["entrypoint"]
         # job is being built from a run
-        entrypoint = [os.path.basename(sys.executable), program_relpath]
-
+        # Use cached basename for sys.executable and avoid recomputing
+        entrypoint = [self._sys_executable_basename, program_relpath]
         return entrypoint
 
     def _get_is_notebook_run(self) -> bool:
