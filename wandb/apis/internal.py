@@ -233,5 +233,14 @@ class Api:
     def stop_run(self, *args, **kwargs):
         return self.api.stop_run(*args, **kwargs)
 
+    @property
+    def api(self):
+        # Cache the constructed api object for efficiency
+        if self._api is None:
+            from wandb.sdk.internal.internal_api import Api as InternalApi
+
+            self._api = InternalApi(*self._api_args, **self._api_kwargs)
+        return self._api
+
 
 __all__ = ["Api"]

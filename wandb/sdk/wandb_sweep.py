@@ -15,20 +15,22 @@ if TYPE_CHECKING:
 def _get_sweep_url(api, sweep_id):
     """Return sweep url if we can figure it out."""
     if api.api_key:
-        if api.settings("entity") is None:
+        entity = api.settings("entity")
+        if entity is None:
             viewer = api.viewer()
-            if viewer.get("entity"):
-                api.set_setting("entity", viewer["entity"])
+            entity_in_viewer = viewer.get("entity")
+            if entity_in_viewer:
+                api.set_setting("entity", entity_in_viewer)
+                entity = entity_in_viewer
         project = api.settings("project")
         if not project:
             return
-        if api.settings("entity"):
-            return "{base}/{entity}/{project}/sweeps/{sweepid}".format(
-                base=api.app_url,
-                entity=urllib.parse.quote(api.settings("entity")),
-                project=urllib.parse.quote(project),
-                sweepid=urllib.parse.quote(sweep_id),
-            )
+        if entity:
+            base = api.app_url
+            entity_quoted = urllib.parse.quote(entity)
+            project_quoted = urllib.parse.quote(project)
+            sweepid_quoted = urllib.parse.quote(sweep_id)
+            return f"{base}/{entity_quoted}/{project_quoted}/sweeps/{sweepid_quoted}"
 
 
 def sweep(
