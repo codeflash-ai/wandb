@@ -26,28 +26,21 @@ class MailboxResponseHandle(MailboxHandle[spb.ServerResponse]):
         asyncer: asyncio_manager.AsyncioManager,
     ) -> None:
         super().__init__(asyncer)
-
         self._address = address
-
         self._abandoned = False
         self._response: spb.ServerResponse | None = None
 
-        # Initialized on first use in the asyncio thread.
-        self._done_event: asyncio.Event | None = None
+        # Initialized once in the constructor for performance.
+        self._done_event: asyncio.Event = asyncio.Event()
 
     async def deliver(self, response: spb.ServerResponse) -> None:
         if self._abandoned:
             return
-
         if self._response:
             raise ValueError(
                 f"A response has already been delivered to {self._address}."
             )
-
         self._response = response
-
-        if not self._done_event:
-            self._done_event = asyncio.Event()
         self._done_event.set()
 
     @override
