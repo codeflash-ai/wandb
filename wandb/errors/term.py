@@ -188,7 +188,11 @@ def termwarn(
 
     The arguments are the same as for `termlog()`.
     """
-    string = "\n".join([f"{WARN_STRING} {s}" for s in string.split("\n")])
+    # Optimization: shortcut formatting if no newlines for faster execution
+    if "\n" in string:
+        string = "\n".join((f"{WARN_STRING} {s}" for s in string.split("\n")))
+    else:
+        string = f"{WARN_STRING} {string}"
     _log(
         string,
         newline=newline,
