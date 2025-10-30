@@ -173,21 +173,31 @@ class Sweeps(SizedPaginator["Sweep"]):
 
         <!-- lazydoc-ignore: internal -->
         """
-        if self.last_response is None or self.last_response.get("project") is None:
-            raise ValueError("Could not find project {}".format(self.project))
+        # Fetch local variables up-front for efficient attribute access
+        last_response = self.last_response
+        project = self.project
+        client = self.client
+        entity = self.entity
 
-        if self.last_response["project"]["totalSweeps"] < 1:
+        if last_response is None or last_response.get("project") is None:
+            raise ValueError(f"Could not find project {project}")
+
+        # Extract results once, avoid deep lookup inside the loop
+        project_data = last_response["project"]
+        if project_data["totalSweeps"] < 1:
             return []
 
+        # Get edges and avoid repeated deep dict access in the list comprehension
+        edges = project_data["sweeps"]["edges"]
+        # Use local variables for object construction
         return [
-            # match format of existing public sweep apis
             public.Sweep(
-                self.client,
-                self.entity,
-                self.project,
-                e["node"]["name"],
+                client,
+                entity,
+                project,
+                edge["node"]["name"],
             )
-            for e in self.last_response["project"]["sweeps"]["edges"]
+            for edge in edges
         ]
 
     def __repr__(self):
