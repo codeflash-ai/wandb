@@ -844,49 +844,47 @@ class _ImageFileType(_dtypes.Type):
         class_map=None,
         **kwargs,
     ):
-        box_layers = box_layers or {}
-        box_score_keys = box_score_keys or []
-        mask_layers = mask_layers or {}
-        class_map = class_map or {}
+        # Avoid multiple dict allocation and redundant checks by using assignment expressions
+        box_layers_obj = box_layers or {}
+        mask_layers_obj = mask_layers or {}
+        class_map_obj = class_map or {}
+        box_score_keys_obj = box_score_keys or []
 
-        if isinstance(box_layers, _dtypes.ConstType):
-            box_layers = box_layers._params["val"]
-        if not isinstance(box_layers, dict):
+        if isinstance(box_layers_obj, _dtypes.ConstType):
+            box_layers_obj = box_layers_obj._params["val"]
+        if not isinstance(box_layers_obj, dict):
             raise TypeError("box_layers must be a dict")
-        else:
-            box_layers = _dtypes.ConstType(
-                {layer_key: set(box_layers[layer_key]) for layer_key in box_layers}
-            )
+        # Avoid redundant list->set conversion by using comprehension directly over .values()
+        box_layers_const = _dtypes.ConstType(
+            {layer_key: set(values) for layer_key, values in box_layers_obj.items()}
+        )
 
-        if isinstance(mask_layers, _dtypes.ConstType):
-            mask_layers = mask_layers._params["val"]
-        if not isinstance(mask_layers, dict):
+        if isinstance(mask_layers_obj, _dtypes.ConstType):
+            mask_layers_obj = mask_layers_obj._params["val"]
+        if not isinstance(mask_layers_obj, dict):
             raise TypeError("mask_layers must be a dict")
-        else:
-            mask_layers = _dtypes.ConstType(
-                {layer_key: set(mask_layers[layer_key]) for layer_key in mask_layers}
-            )
+        mask_layers_const = _dtypes.ConstType(
+            {layer_key: set(values) for layer_key, values in mask_layers_obj.items()}
+        )
 
-        if isinstance(box_score_keys, _dtypes.ConstType):
-            box_score_keys = box_score_keys._params["val"]
-        if not isinstance(box_score_keys, list) and not isinstance(box_score_keys, set):
+        if isinstance(box_score_keys_obj, _dtypes.ConstType):
+            box_score_keys_obj = box_score_keys_obj._params["val"]
+        if not isinstance(box_score_keys_obj, (list, set)):
             raise TypeError("box_score_keys must be a list or a set")
-        else:
-            box_score_keys = _dtypes.ConstType(set(box_score_keys))
+        box_score_keys_const = _dtypes.ConstType(set(box_score_keys_obj))
 
-        if isinstance(class_map, _dtypes.ConstType):
-            class_map = class_map._params["val"]
-        if not isinstance(class_map, dict):
+        if isinstance(class_map_obj, _dtypes.ConstType):
+            class_map_obj = class_map_obj._params["val"]
+        if not isinstance(class_map_obj, dict):
             raise TypeError("class_map must be a dict")
-        else:
-            class_map = _dtypes.ConstType(class_map)
+        class_map_const = _dtypes.ConstType(class_map_obj)
 
         self.params.update(
             {
-                "box_layers": box_layers,
-                "box_score_keys": box_score_keys,
-                "mask_layers": mask_layers,
-                "class_map": class_map,
+                "box_layers": box_layers_const,
+                "box_score_keys": box_score_keys_const,
+                "mask_layers": mask_layers_const,
+                "class_map": class_map_const,
             }
         )
 
@@ -903,36 +901,35 @@ class _ImageFileType(_dtypes.Type):
             class_map_other = wb_type.params["class_map"].params["val"] or {}
 
             # Merge the class_ids from each set of box_layers
+            box_layers_keys = set(box_layers_self.keys())
+            box_layers_keys.update(box_layers_other.keys())
             box_layers = {
-                str(key): set(
-                    list(box_layers_self.get(key, []))
-                    + list(box_layers_other.get(key, []))
+                str(key): box_layers_self.get(key, set()).union(
+                    box_layers_other.get(key, set())
                 )
-                for key in set(
-                    list(box_layers_self.keys()) + list(box_layers_other.keys())
-                )
+                for key in box_layers_keys
             }
 
             # Merge the class_ids from each set of mask_layers
+            mask_layers_keys = set(mask_layers_self.keys())
+            mask_layers_keys.update(mask_layers_other.keys())
             mask_layers = {
-                str(key): set(
-                    list(mask_layers_self.get(key, []))
-                    + list(mask_layers_other.get(key, []))
+                str(key): mask_layers_self.get(key, set()).union(
+                    mask_layers_other.get(key, set())
                 )
-                for key in set(
-                    list(mask_layers_self.keys()) + list(mask_layers_other.keys())
-                )
+                for key in mask_layers_keys
             }
 
-            # Merge the box score keys
-            box_score_keys = set(list(box_score_keys_self) + list(box_score_keys_other))
+            # Merge the box score keys efficiently
+            box_score_keys = set(box_score_keys_self)
+            box_score_keys.update(box_score_keys_other)
 
-            # Merge the class_map
+            # Merge the class_map efficiently
+            class_map_keys = set(class_map_self.keys())
+            class_map_keys.update(class_map_other.keys())
             class_map = {
                 str(key): class_map_self.get(key, class_map_other.get(key, None))
-                for key in set(
-                    list(class_map_self.keys()) + list(class_map_other.keys())
-                )
+                for key in class_map_keys
             }
 
             return _ImageFileType(box_layers, box_score_keys, mask_layers, class_map)
