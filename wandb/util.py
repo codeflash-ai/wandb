@@ -71,6 +71,12 @@ if TYPE_CHECKING:
     import wandb.sdk.wandb_settings
     from wandb.sdk.artifacts.artifact import Artifact
 
+_ARTIFACT_SAFE_RE = re.compile(r"[^a-zA-Z0-9_\-.]")
+
+_MAX_LENGTH = 128
+
+_SPLIT_LENGTH = 63
+
 CheckRetryFnType = Callable[[Exception], Union[bool, timedelta]]
 T = TypeVar("T")
 
@@ -1837,11 +1843,12 @@ def ensure_text(
 def make_artifact_name_safe(name: str) -> str:
     """Make an artifact name safe for use in artifacts."""
     # artifact names may only contain alphanumeric characters, dashes, underscores, and dots.
-    cleaned = re.sub(r"[^a-zA-Z0-9_\-.]", "_", name)
-    if len(cleaned) <= 128:
+    cleaned = _ARTIFACT_SAFE_RE.sub("_", name)
+    if len(cleaned) <= _MAX_LENGTH:
         return cleaned
-    # truncate with dots in the middle using regex
-    return re.sub(r"(^.{63}).*(.{63}$)", r"\g<1>..\g<2>", cleaned)
+    # Faster string slicing instead of regex for truncation with dots in the middle
+    # Matches original logic: First 63, '..', Last 63 = 128
+    return f"{cleaned[:_SPLIT_LENGTH]}..{cleaned[-_SPLIT_LENGTH:]}"
 
 
 def make_docker_image_name_safe(name: str) -> str:
