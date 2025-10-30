@@ -128,6 +128,10 @@ class PolicyLive(FileEventHandler):
         else:
             self._min_wait_time = None
 
+        self._current_stat: Optional[os.stat_result] = None
+        self._current_stat_mtime: Optional[float] = None
+        self._current_stat_size: Optional[int] = None
+
     @property
     def current_size(self) -> int:
         return os.path.getsize(self.file_path)
@@ -144,10 +148,10 @@ class PolicyLive(FileEventHandler):
             return 20 * 60
 
     def should_update(self) -> bool:
+        # Assumes os.stat has already been called and mtime/size cached
         if self._last_uploaded_time is not None:
             # Check rate limit by time elapsed
             time_elapsed = time.time() - self._last_uploaded_time
-            # if more than 15 seconds has passed potentially upload it
             if time_elapsed < self.RATE_LIMIT_SECONDS:
                 return False
 
@@ -164,18 +168,28 @@ class PolicyLive(FileEventHandler):
         return True
 
     def on_modified(self, force: bool = False) -> None:
-        if self.current_size == 0:
-            return
-        if self._last_sync == os.path.getmtime(self.file_path):
-            return
-        if force or self.should_update():
-            self.save_file()
+        self._refresh_stat()
+        try:
+            # Only one stat() call for all code paths
+            if self._current_stat_size == 0:
+                return
+            if self._last_sync == self._current_stat_mtime:
+                return
+            if force or self.should_update():
+                self.save_file()
+        finally:
+            self._clear_cached_stat()
 
     def save_file(self) -> None:
-        self._last_sync = os.path.getmtime(self.file_path)
-        self._last_uploaded_time = time.time()
-        self._last_uploaded_size = self.current_size
-        self._file_pusher.file_changed(self.save_name, self.file_path)
+        # Call _refresh_stat so that mtime is accurate and consistent with decision logic
+        self._refresh_stat()
+        try:
+            self._last_sync = self._current_stat_mtime
+            self._last_uploaded_time = time.time()
+            self._last_uploaded_size = self._current_stat_size
+            self._file_pusher.file_changed(self.save_name, self.file_path)
+        finally:
+            self._clear_cached_stat()
 
     def finish(self) -> None:
         self.on_modified(force=True)
@@ -183,6 +197,28 @@ class PolicyLive(FileEventHandler):
     @property
     def policy(self) -> "PolicyName":
         return "live"
+
+    @property
+    def current_size(self) -> int:
+        # Cache stat for the current call chain
+        if self._current_stat is None:
+            stat = os.stat(self.file_path)
+            self._current_stat = stat
+            self._current_stat_mtime = stat.st_mtime
+            self._current_stat_size = stat.st_size
+        return self._current_stat_size
+
+    def _refresh_stat(self) -> None:
+        # Refresh and cache stat calls for current event
+        stat = os.stat(self.file_path)
+        self._current_stat = stat
+        self._current_stat_mtime = stat.st_mtime
+        self._current_stat_size = stat.st_size
+
+    def _clear_cached_stat(self) -> None:
+        self._current_stat = None
+        self._current_stat_mtime = None
+        self._current_stat_size = None
 
 
 class DirWatcher:
@@ -329,9 +365,7 @@ class DirWatcher:
                 make_handler = (
                     PolicyLive
                     if policy_name == "live"
-                    else PolicyNow
-                    if policy_name == "now"
-                    else PolicyEnd
+                    else PolicyNow if policy_name == "now" else PolicyEnd
                 )
                 self._file_event_handlers[save_name] = make_handler(
                     file_path, save_name, self._file_pusher, self._settings
