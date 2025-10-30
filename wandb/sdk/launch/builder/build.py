@@ -285,9 +285,7 @@ def get_user_setup(username: str, userid: int, runner_type: str) -> str:
     if runner_type == "sagemaker":
         # sagemaker must run as root
         return "USER root"
-    user_create = USER_CREATE_TEMPLATE.format(uid=userid, user=username)
-    user_create += f"\nUSER {username}"
-    return user_create
+    return f"{USER_CREATE_TEMPLATE.format(uid=userid, user=username)}\nUSER {username}"
 
 
 def get_entrypoint_setup(
