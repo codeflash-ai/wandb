@@ -90,7 +90,9 @@ def gather_batch(
 def prepare_response(response: "CreateArtifactFilesResponseFile") -> ResponsePrepare:
     multipart_resp = response.get("uploadMultipartUrls")
     part_list = multipart_resp["uploadUrlParts"] if multipart_resp else []
-    multipart_parts = {u["partNumber"]: u["uploadUrl"] for u in part_list} or None
+    multipart_parts = (
+        {u["partNumber"]: u["uploadUrl"] for u in part_list} if part_list else None
+    )
 
     return ResponsePrepare(
         birth_artifact_id=response["artifact"]["id"],
