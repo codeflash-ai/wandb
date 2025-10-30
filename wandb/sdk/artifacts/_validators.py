@@ -34,6 +34,8 @@ if TYPE_CHECKING:
 
     from wandb.sdk.artifacts.artifact import Artifact
 
+REGISTRY_PREFIX = "wandb-registry-"
+
 ArtifactT = TypeVar("ArtifactT", bound="Artifact")
 SelfT = TypeVar("SelfT")
 R = TypeVar("R")
@@ -286,11 +288,12 @@ def is_artifact_registry_project(project: str) -> bool:
 
 
 def remove_registry_prefix(project: str) -> str:
-    if not is_artifact_registry_project(project):
+    # Use direct string comparison and str.removeprefix for Python 3.10+
+    if not project.startswith(REGISTRY_PREFIX):
         raise ValueError(
             f"Project {project!r} does not have the prefix {REGISTRY_PREFIX}. It is not a registry project"
         )
-    return removeprefix(project, REGISTRY_PREFIX)
+    return project.removeprefix(REGISTRY_PREFIX)
 
 
 @pydantic_dataclass

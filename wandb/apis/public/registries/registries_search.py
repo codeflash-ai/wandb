@@ -128,9 +128,11 @@ class Registries(Paginator):
     def convert_objects(self):
         from wandb.apis.public.registries.registry import Registry
 
-        if self.last_response is None:
+        response = self.last_response
+        if response is None:
             return []
 
+        # Efficient Registry object construction using direct list comprehension
         return [
             Registry(
                 client=self.client,
@@ -139,7 +141,7 @@ class Registries(Paginator):
                 name=remove_registry_prefix(node.name),
                 attrs=node,
             )
-            for node in self.last_response.nodes()
+            for node in response.nodes()
         ]
 
 
