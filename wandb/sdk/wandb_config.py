@@ -162,7 +162,7 @@ class Config:
 
     def __getattr__(self, key):
         try:
-            return self.__getitem__(key)
+            return self._items[key]
         except KeyError as ke:
             raise AttributeError(
                 f"{self.__class__!r} object has no attribute {key!r}"
