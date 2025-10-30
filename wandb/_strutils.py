@@ -37,4 +37,10 @@ def nameof(obj: Any, full: bool = True) -> str:
     If `full` is True, attempt to return the object's `__qualname__` attribute,
     falling back on the `__name__` attribute.
     """
-    return getattr(obj, "__qualname__", obj.__name__) if full else obj.__name__
+    # Avoid repeated attribute lookup
+    if full:
+        qual_name = getattr(obj, "__qualname__", None)
+        if qual_name is not None:
+            return qual_name
+        return obj.__name__
+    return obj.__name__
