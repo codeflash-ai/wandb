@@ -50,6 +50,8 @@ from .wandb_settings import Settings
 if TYPE_CHECKING:
     import wandb.jupyter
 
+_NONE_PRINTER_CALLBACK = lambda _: None
+
 
 def _huggingface_version() -> str | None:
     if "transformers" in sys.modules:
@@ -124,7 +126,8 @@ class _PrinterCallback(Protocol):
 
 def _noop_printer_callback() -> _PrinterCallback:
     """A printer callback that does not print anything."""
-    return lambda _: None
+    # Returning the NoneType callable directly avoids recreating a new lambda on each call.
+    return _NONE_PRINTER_CALLBACK
 
 
 def _concat_printer_callbacks(
