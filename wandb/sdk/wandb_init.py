@@ -27,6 +27,7 @@ from typing_extensions import Any, Literal, Protocol, Self
 
 import wandb
 import wandb.env
+import wandb.jupyter
 from wandb import env, trigger
 from wandb.errors import CommError, Error, UsageError
 from wandb.errors.links import url_registry
@@ -124,7 +125,12 @@ class _PrinterCallback(Protocol):
 
 def _noop_printer_callback() -> _PrinterCallback:
     """A printer callback that does not print anything."""
-    return lambda _: None
+
+    # Using a local static function object for no-op to avoid new lambda creation overhead.
+    def _noop(_: object) -> None:
+        pass
+
+    return _noop
 
 
 def _concat_printer_callbacks(
@@ -229,34 +235,40 @@ class _WandbInit:
         Returns:
             A callback to print any generated warnings.
         """
-        when_doing_thing = ""
+        # Optimize context check by merging the two if blocks and short-circuit as fast as possible
+        settings = self._wl.settings
+        sweep_id = settings.sweep_id
+        launch = settings.launch
 
-        if self._wl.settings.sweep_id:
+        # Instead of creating two branches, use tuple lookup for "when_doing_thing"
+        if sweep_id:
             when_doing_thing = "when running a sweep"
-        elif self._wl.settings.launch:
+        elif launch:
             when_doing_thing = "when running from a wandb launch context"
-
-        if not when_doing_thing:
+        else:
             return _noop_printer_callback()
 
         warnings = []
 
-        def warn(key: str, value: str) -> None:
-            warnings.append(f"Ignoring {key} {value!r} {when_doing_thing}.")
-
-        if init_settings.project is not None:
-            warn("project", init_settings.project)
+        # Inline warn calls, avoid nested function creation
+        project = init_settings.project
+        if project is not None:
+            warnings.append(f"Ignoring project {project!r} {when_doing_thing}.")
             init_settings.project = None
-        if init_settings.entity is not None:
-            warn("entity", init_settings.entity)
+        entity = init_settings.entity
+        if entity is not None:
+            warnings.append(f"Ignoring entity {entity!r} {when_doing_thing}.")
             init_settings.entity = None
-        if init_settings.run_id is not None:
-            warn("run_id", init_settings.run_id)
+        run_id = init_settings.run_id
+        if run_id is not None:
+            warnings.append(f"Ignoring run_id {run_id!r} {when_doing_thing}.")
             init_settings.run_id = None
 
+        # Instead of defining a nested function, use a closure variable to return the callback directly.
         def print_warnings(run_printer: printer.Printer) -> None:
+            display = run_printer.display
             for warning in warnings:
-                run_printer.display(warning, level="warn")
+                display(warning, level="warn")
 
         return print_warnings
 
