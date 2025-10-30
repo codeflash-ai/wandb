@@ -93,10 +93,10 @@ class Config:
     """
 
     def __init__(self):
-        object.__setattr__(self, "_items", dict())
-        object.__setattr__(self, "_locked", dict())
-        object.__setattr__(self, "_users", dict())
-        object.__setattr__(self, "_users_inv", dict())
+        object.__setattr__(self, "_items", {})
+        object.__setattr__(self, "_locked", {})
+        object.__setattr__(self, "_users", {})
+        object.__setattr__(self, "_users_inv", {})
         object.__setattr__(self, "_users_cnt", 0)
         object.__setattr__(self, "_callback", None)
         object.__setattr__(self, "_settings", None)
@@ -206,12 +206,14 @@ class Config:
             self._callback(data=d)
 
     def _get_user_id(self, user) -> int:
-        if user not in self._users:
-            self._users[user] = self._users_cnt
-            self._users_inv[self._users_cnt] = user
-            object.__setattr__(self, "_users_cnt", self._users_cnt + 1)
-
-        return self._users[user]
+        users = self._users
+        if user in users:
+            return users[user]
+        cnt = self._users_cnt
+        users[user] = cnt
+        self._users_inv[cnt] = user
+        object.__setattr__(self, "_users_cnt", cnt + 1)
+        return cnt
 
     def update_locked(self, d, user=None, _allow_val_change=None):
         """Shallow-update config with `d` and lock config updates on d's keys."""
