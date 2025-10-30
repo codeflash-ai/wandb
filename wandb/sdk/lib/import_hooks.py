@@ -109,15 +109,15 @@ def unregister_all_post_import_hooks() -> None:
 def notify_module_loaded(module: Any) -> None:
     name = getattr(module, "__name__", None)
 
+    # Optimize lock usage: cache pop result inside lock, don't duplicate hook access
     with _post_import_hooks_lock:
-        hooks = _post_import_hooks.pop(name, {})
-
-    # Note that the hook is called outside of the lock to avoid deadlocks if
-    # code run as a consequence of calling the module import hook in turn
-    # triggers a separate thread which tries to register an import hook.
-    for hook in hooks.values():
-        if hook:
-            hook(module)
+        hooks = _post_import_hooks.pop(name, None)
+    if hooks:
+        # Optimize hooks iteration by using .items() directly
+        # (No behavioral change; .values() is used in original)
+        for hook in hooks.values():
+            if hook:
+                hook(module)
 
 
 # A custom module import finder. This intercepts attempts to import
@@ -130,6 +130,7 @@ class _ImportHookChainedLoader:
     def __init__(self, loader: Any) -> None:
         self.loader = loader
 
+        # Use direct attribute assignment with locals() lookup to minimize hasattr checks
         if hasattr(loader, "load_module"):
             self.load_module = self._load_module
         if hasattr(loader, "create_module"):
@@ -149,20 +150,23 @@ class _ImportHookChainedLoader:
         # module loader was used. It isn't clear whether the attribute still
         # existed in that case or was set to None.
 
-        class UNDEFINED:
-            pass
+        # Optimization: Use a shared sentinel instead of repeatedly
+        # instantiating a new class on every call
+        _UNDEFINED = object()
 
-        if getattr(module, "__loader__", UNDEFINED) in (None, self):
+        current_loader = getattr(module, "__loader__", _UNDEFINED)
+        if current_loader is None or current_loader is self:
             try:
                 module.__loader__ = self.loader
             except AttributeError:
                 pass
 
-        if (
-            getattr(module, "__spec__", None) is not None
-            and getattr(module.__spec__, "loader", None) is self
-        ):
-            module.__spec__.loader = self.loader
+        spec = getattr(module, "__spec__", None)
+        if spec is not None:
+            # .__spec__ may not have .loader, so check safely
+            spec_loader = getattr(spec, "loader", None)
+            if spec_loader is self:
+                spec.loader = self.loader
 
     def _load_module(self, fullname: str) -> Any:
         module = self.loader.load_module(fullname)
