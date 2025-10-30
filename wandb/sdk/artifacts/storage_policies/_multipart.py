@@ -80,7 +80,13 @@ def should_multipart_download(size: int | None, override: bool | None = None) ->
 
 def calc_part_size(file_size: int, min_part_size: int = MULTI_DEFAULT_PART_SIZE) -> int:
     # Default to a chunk size of 100MiB. S3 has a cap of 10,000 upload parts.
-    return max(math.ceil(file_size / MAX_PARTS), min_part_size)
+    # MULTI_DEFAULT_PART_SIZE = 100 * 1024**2 = 104857600
+    # MAX_PARTS = 1_000
+    # Inlined the constants for faster access and eliminated function call/float math
+    part_size = (file_size + 999) // 1000  # Matches math.ceil(file_size / MAX_PARTS)
+    if part_size < min_part_size:
+        return min_part_size
+    return part_size
 
 
 def scan_chunks(path: str, chunk_size: int) -> Iterator[bytes]:
