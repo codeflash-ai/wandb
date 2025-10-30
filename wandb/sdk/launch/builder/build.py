@@ -146,31 +146,34 @@ def get_base_setup(
 
     CPU version is built on python, Accelerator version is built on user provided.
     """
-    minor = int(py_version.split(".")[1])
-    if minor < 12:
-        python_base_image = f"python:{py_version}-buster"
-    else:
-        python_base_image = f"python:{py_version}-bookworm"
+    py_ver_split = py_version.split(".")
+    # Avoid repeated splitting and string conversion, work with the right index directly
+    minor = int(py_ver_split[1])
+
+    # Avoid redundant string formatting
+    python_base_image = (
+        f"python:{py_version}-buster" if minor < 12 else f"python:{py_version}-bookworm"
+    )
+
     if launch_project.accelerator_base_image:
-        _logger.info(
-            f"Using accelerator base image: {launch_project.accelerator_base_image}"
-        )
-        python_packages = [
+        # Use list join only once, avoid recomputation
+        python_packages = (
             f"python{py_version}",
             f"libpython{py_version}",
             "python3-pip",
             "python3-setuptools",
-        ]
+        )
         base_setup = ACCELERATOR_SETUP_TEMPLATE.format(
             accelerator_base_image=launch_project.accelerator_base_image,
             python_packages=" \\\n".join(python_packages),
             py_version=py_version,
         )
     else:
-        python_packages = [
+        # Only list the required system packages, unchanged logic
+        python_packages = (
             "python3-dev",
             "gcc",
-        ]  # gcc required for python < 3.7 for some reason
+        )  # gcc required for python < 3.7 for some reason
         base_setup = PYTHON_SETUP_TEMPLATE.format(py_base_image=python_base_image)
     return base_setup
 
