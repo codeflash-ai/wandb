@@ -8,7 +8,6 @@ import sys
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Dict,
     List,
     Literal,
@@ -289,19 +288,18 @@ class JobBuilder:
         return source, name
 
     def _log_if_verbose(self, message: str, level: LOG_LEVEL) -> None:
-        log_func: Optional[Union[Callable[[Any], None], Callable[[Any], None]]] = None
         if level == "log":
             _logger.info(message)
-            log_func = wandb.termlog
+            if self._verbose:
+                wandb.termlog(message)
         elif level == "warn":
             _logger.warning(message)
-            log_func = wandb.termwarn
+            if self._verbose:
+                wandb.termwarn(message)
         elif level == "error":
             _logger.error(message)
-            log_func = wandb.termerror
-
-        if self._verbose and log_func is not None:
-            log_func(message)
+            if self._verbose:
+                wandb.termerror(message)
 
     def _build_artifact_job_source(
         self,
@@ -311,7 +309,8 @@ class JobBuilder:
         assert isinstance(self._logged_code_artifact, dict)
         # TODO: should we just always exit early if the path doesn't exist?
         if self._is_notebook_run and not self._is_colab_run():
-            full_program_relpath = os.path.relpath(program_relpath, os.getcwd())
+            cwd = os.getcwd()
+            full_program_relpath = os.path.relpath(program_relpath, cwd)
             # if the resolved path doesn't exist, then we shouldn't make a job because it will fail
             if not os.path.exists(full_program_relpath):
                 # when users call log code in a notebook the code artifact starts
@@ -336,7 +335,7 @@ class JobBuilder:
             "build_context": metadata.get("build_context"),
             "dockerfile": metadata.get("dockerfile"),
         }
-        artifact_basename, *_ = self._logged_code_artifact["name"].split(":")
+        artifact_basename = self._logged_code_artifact["name"].partition(":")[0]
         name = self._make_job_name(artifact_basename)
 
         return source, name
@@ -379,8 +378,8 @@ class JobBuilder:
         # if building a partial job from CLI, overwrite entrypoint and notebook
         # should already be in metadata from create_job
         if self._partial:
-            if metadata.get("entrypoint"):
-                entrypoint: List[str] = metadata["entrypoint"]
+            entrypoint = metadata.get("entrypoint")
+            if entrypoint is not None:
                 return entrypoint
         # job is being built from a run
         entrypoint = [os.path.basename(sys.executable), program_relpath]
