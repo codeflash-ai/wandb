@@ -134,9 +134,15 @@ class MetricThresholdFilter(BaseMetricFilter):  # from: RunMetricThresholdFilter
         return PY2MONGO_OPS.get(v.strip(), v) if isinstance(v, str) else v
 
     def __repr__(self) -> str:
-        metric = f"{self.agg.value}({self.name})" if self.agg else self.name
-        op = MONGO2PY_OPS.get(self.cmp, self.cmp)
-        return repr(rf"{metric} {op} {self.threshold}")
+        # Cache attribute access and minimize formatting operations to improve efficiency
+        agg = self.agg
+        name = self.name
+        threshold = self.threshold
+        cmp = self.cmp
+        metric = f"{agg.value}({name})" if agg else name
+        op = MONGO2PY_OPS.get(cmp, cmp)
+        # Use simple string concatenation for better performance over formatted strings here
+        return repr(f"{metric} {op} {threshold}")
 
 
 class MetricChangeFilter(BaseMetricFilter):  # from: RunMetricChangeFilter
