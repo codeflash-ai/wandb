@@ -26,7 +26,15 @@ class ConfigState:
 
     def non_internal_config(self) -> Dict[str, Any]:
         """Returns the config settings minus "_wandb"."""
-        return {k: v for k, v in self._tree.items() if k != _WANDB_INTERNAL_KEY}
+        # Use dict comprehension but avoid unnecessary comparisons by leveraging dict view
+        # Avoid allocating extra memory for items if key is not present
+        tree = self._tree
+        if _WANDB_INTERNAL_KEY in tree:
+            # Copy all except _WANDB_INTERNAL_KEY
+            result = dict(tree)
+            del result[_WANDB_INTERNAL_KEY]
+            return result
+        return dict(tree)
 
     def update_from_proto(
         self,
