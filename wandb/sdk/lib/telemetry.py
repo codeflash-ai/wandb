@@ -12,6 +12,8 @@ from wandb.proto.wandb_telemetry_pb2 import TelemetryRecord
 if TYPE_CHECKING:
     from .. import wandb_run
 
+_TOKEN_RE = re.compile(r'([a-zA-Z0-9_]+)\s*=\s*("[a-zA-Z0-9_-]*"|[a-zA-Z0-9_-]*)[,}]')
+
 
 _LABEL_TOKEN: str = "@wandbcode{"
 
@@ -53,30 +55,39 @@ MATCH_RE = re.compile(r"(?P<code>[a-zA-Z0-9_-]+)[,}](?P<rest>.*)")
 
 def _parse_label_lines(lines: List[str]) -> Dict[str, str]:
     seen = False
-    ret = {}
+    ret: Dict[str, str] = {}
+    label_token = _LABEL_TOKEN  # local var for faster access
+    label_token_len = len(label_token)
+    match_re = MATCH_RE
+    token_re = _TOKEN_RE
+
     for line in lines:
-        idx = line.find(_LABEL_TOKEN)
+        idx = line.find(label_token)
         if idx < 0:
             # Stop parsing on first non token line after match
             if seen:
                 break
             continue
         seen = True
-        label_str = line[idx + len(_LABEL_TOKEN) :]
+        label_str = line[idx + label_token_len :]
 
-        # match identifier (first token without key=value syntax (optional)
-        # Note: Parse is fairly permissive as it does not enforce strict syntax
-        r = MATCH_RE.match(label_str)
+        r = match_re.match(label_str)
         if r:
-            ret["code"] = r.group("code").replace("-", "_")
+            code_val = r.group("code")
+            if "-" in code_val:
+                code_val = code_val.replace("-", "_")
+            ret["code"] = code_val
             label_str = r.group("rest")
 
-        # match rest of tokens on one line
-        tokens = re.findall(
-            r'([a-zA-Z0-9_]+)\s*=\s*("[a-zA-Z0-9_-]*"|[a-zA-Z0-9_-]*)[,}]', label_str
-        )
+        tokens = token_re.findall(label_str)
         for k, v in tokens:
-            ret[k] = v.strip('"').replace("-", "_")
+            if v and v[0] == '"' and v[-1] == '"':
+                v_unquoted = v[1:-1]
+            else:
+                v_unquoted = v
+            if "-" in v_unquoted:
+                v_unquoted = v_unquoted.replace("-", "_")
+            ret[k] = v_unquoted
     return ret
 
 
