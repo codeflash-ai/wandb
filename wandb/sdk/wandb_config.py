@@ -93,10 +93,10 @@ class Config:
     """
 
     def __init__(self):
-        object.__setattr__(self, "_items", dict())
-        object.__setattr__(self, "_locked", dict())
-        object.__setattr__(self, "_users", dict())
-        object.__setattr__(self, "_users_inv", dict())
+        object.__setattr__(self, "_items", {})
+        object.__setattr__(self, "_locked", {})
+        object.__setattr__(self, "_users", {})
+        object.__setattr__(self, "_users_inv", {})
         object.__setattr__(self, "_users_cnt", 0)
         object.__setattr__(self, "_callback", None)
         object.__setattr__(self, "_settings", None)
