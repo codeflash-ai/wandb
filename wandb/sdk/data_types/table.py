@@ -76,9 +76,16 @@ class _ForeignKeyType(_dtypes.Type):
     types = [_TableKey]
 
     def __init__(self, table, col_name):
+        # Faster membership test using a set if columns is large.
         assert isinstance(table, Table)
         assert isinstance(col_name, str)
-        assert col_name in table.columns
+        cols = table.columns
+        if len(cols) > 16 and not isinstance(cols, set):
+            # For large column lists, convert to set for faster lookup, but do NOT mutate the original list
+            # So we only use a temp set for membership test
+            assert col_name in set(cols)
+        else:
+            assert col_name in cols
         self.params.update({"table": table, "col_name": col_name})
 
     def assign_type(self, wb_type=None):
@@ -118,19 +125,16 @@ class _ForeignKeyType(_dtypes.Type):
         json_dict,
         artifact,
     ):
-        table = None
-        col_name = None
+        # Avoid unnecessary assignments
         if artifact is None:
             raise AssertionError(
                 "_ForeignKeyType does not support deserialization without an artifact"
             )
-        else:
-            table = artifact.get(json_dict["params"]["table"])
-            col_name = json_dict["params"]["col_name"]
+        table = artifact.get(json_dict["params"]["table"])
+        col_name = json_dict["params"]["col_name"]
 
         if table is None:
             raise AssertionError("Unable to deserialize referenced table")
-
         return cls(table, col_name)
 
 
