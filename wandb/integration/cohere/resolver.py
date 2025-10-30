@@ -30,29 +30,30 @@ def reorder_and_convert_dict_list_to_table(
     :param order: A list of keys specifying the desired order for specific dictionaries. The remaining dictionaries will be ordered based on their original order.
     :return: A pair of column names and corresponding values.
     """
-    final_columns = []
-    keys_present = set()
+    final_columns_dict = {}
 
     # First, add all ordered keys to the final columns
     for key in order:
-        if key not in keys_present:
-            final_columns.append(key)
-            keys_present.add(key)
+        if key not in final_columns_dict:
+            final_columns_dict[key] = None
 
     # Then, add any keys present in the dictionaries but not in the order
     for d in data:
         for key in d:
-            if key not in keys_present:
-                final_columns.append(key)
-                keys_present.add(key)
+            if key not in final_columns_dict:
+                final_columns_dict[key] = None
+
+    final_columns = list(final_columns_dict.keys())
+    col_indices = {k: i for i, k in enumerate(final_columns)}
 
     # Then, construct the table of values
-    values = []
-    for d in data:
-        row = []
-        for key in final_columns:
-            row.append(d.get(key, None))
-        values.append(row)
+    values = [[None] * len(final_columns) for _ in data]
+    for row_idx, d in enumerate(data):
+        row = values[row_idx]
+        for key, val in d.items():
+            idx = col_indices.get(key)
+            if idx is not None:
+                row[idx] = val
 
     return final_columns, values
 
