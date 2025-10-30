@@ -209,7 +209,11 @@ def termerror(
 
     The arguments are the same as for `termlog()`.
     """
-    string = "\n".join([f"{ERROR_STRING} {s}" for s in string.split("\n")])
+    # Optimize joining logic to handle single-line error messages more efficiently
+    if "\n" in string:
+        string = "\n".join([f"{ERROR_STRING} {s}" for s in string.split("\n")])
+    else:
+        string = f"{ERROR_STRING} {string}"
     _log(
         string,
         newline=newline,

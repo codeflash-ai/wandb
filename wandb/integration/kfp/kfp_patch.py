@@ -43,18 +43,17 @@ import wandb
 
 
 def full_path_exists(full_func):
-    def get_parent_child_pairs(full_func):
-        components = full_func.split(".")
-        parents, children = [], []
-        for i, _ in enumerate(components[:-1], 1):
-            parent = ".".join(components[:i])
-            child = components[i]
-            parents.append(parent)
-            children.append(child)
-        return zip(parents, children)
-
-    for parent, child in get_parent_child_pairs(full_func):
-        module = wandb.util.get_module(parent)
+    components = full_func.split(".")
+    n = len(components)
+    module_cache = {}
+    for i in range(1, n):
+        parent = ".".join(components[:i])
+        child = components[i]
+        if parent in module_cache:
+            module = module_cache[parent]
+        else:
+            module = wandb.util.get_module(parent)
+            module_cache[parent] = module
         if not module or not hasattr(module, child) or getattr(module, child) is None:
             return False
     return True
@@ -70,12 +69,14 @@ def patch(module_name, func):
             f"Failed to patch {module_name}.{func.__name__}!  Please check if this package/module is installed!"
         )
     else:
-        wandb.patched.setdefault(module.__name__, [])
+        patched_mod = wandb.patched.setdefault(module.__name__, [])
         # if already patched, do not patch again
-        if [module, func.__name__] not in wandb.patched[module.__name__]:
-            setattr(module, f"orig_{func.__name__}", getattr(module, func.__name__))
+        patch_entry = [module, func.__name__]
+        if patch_entry not in patched_mod:
+            orig_func_attr = f"orig_{func.__name__}"
+            setattr(module, orig_func_attr, getattr(module, func.__name__))
             setattr(module, func.__name__, func)
-            wandb.patched[module.__name__].append([module, func.__name__])
+            patched_mod.append(patch_entry)
         success = True
 
     return success
