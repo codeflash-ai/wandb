@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from wandb.docker import names
 from wandb.errors import Error
+from functools import lru_cache
 
 
 class DockerError(Error):
@@ -79,6 +80,7 @@ def is_buildx_installed() -> bool:
     return _buildx_installed
 
 
+@lru_cache(maxsize=1)
 def is_docker_installed() -> bool:
     """Return `True` if docker is installed and working, else `False`."""
     try:
