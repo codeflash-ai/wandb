@@ -209,9 +209,7 @@ def _make_example(data: Any) -> Optional[Union[Dict, Sequence, Any]]:
     example: Optional[Union[Dict, Sequence, Any]]
 
     if isinstance(data, dict):
-        example = {}
-        for key in data:
-            example[key] = data[key][0]
+        example = {key: value[0] for key, value in data.items()}
     elif hasattr(data, "__len__"):
         example = data[0]
     else:
@@ -291,8 +289,8 @@ def _infer_single_example_keyed_processor(
     ):
         # assume this is a class
         if class_labels_table is not None:
-            processors["class"] = (
-                lambda n, d, p: class_labels_table.index_ref(d[0])
+            processors["class"] = lambda n, d, p: (
+                class_labels_table.index_ref(d[0])
                 if d[0] < len(class_labels_table.data)
                 else d[0]
             )  # type: ignore
@@ -410,9 +408,11 @@ def _infer_validation_row_processor(
                 lambda ndx, row, key_processor, key: key_processor(
                     ndx,
                     row[key],
-                    row[input_col_name]
-                    if not isinstance(example_input, dict)
-                    else None,
+                    (
+                        row[input_col_name]
+                        if not isinstance(example_input, dict)
+                        else None
+                    ),
                 ),
                 key_processor=key_processors[p_key],
                 key=key,
@@ -461,9 +461,11 @@ def _infer_prediction_row_processor(
                 lambda ndx, row, key_processor, key: key_processor(
                     ndx,
                     row[key],
-                    ndx.get_row().get("val_row").get_row().get(input_col_name)
-                    if not isinstance(example_input, dict)
-                    else None,
+                    (
+                        ndx.get_row().get("val_row").get_row().get(input_col_name)
+                        if not isinstance(example_input, dict)
+                        else None
+                    ),
                 ),
                 key_processor=key_processors[p_key],
                 key=key,
