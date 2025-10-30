@@ -11,6 +11,17 @@ from .builder.abstract import AbstractBuilder
 from .environment.abstract import AbstractEnvironment
 from .registry.abstract import AbstractRegistry
 from .runner.abstract import AbstractRunner
+from wandb.sdk.launch.environment.aws_environment import AwsEnvironment
+from wandb.sdk.launch.environment.azure_environment import AzureEnvironment
+from wandb.sdk.launch.environment.gcp_environment import GcpEnvironment
+from wandb.sdk.launch.environment.local_environment import LocalEnvironment
+
+_environment_factories = {
+    "local": LocalEnvironment.from_config,
+    "aws": AwsEnvironment.from_config,
+    "gcp": GcpEnvironment.from_config,
+    "azure": AzureEnvironment.from_config,
+}
 
 WANDB_RUNNERS = {
     "local-container",
@@ -36,33 +47,18 @@ def environment_from_config(config: Optional[Dict[str, Any]]) -> AbstractEnviron
         Environment: The environment constructed.
     """
     if not config:
-        from .environment.local_environment import LocalEnvironment
-
         return LocalEnvironment()  # This is the default, dummy environment.
     env_type = config.get("type")
     if not env_type:
         raise LaunchError(
             "Could not create environment from config. Environment type not specified!"
         )
-    if env_type == "local":
-        from .environment.local_environment import LocalEnvironment
-
-        return LocalEnvironment.from_config(config)
-    if env_type == "aws":
-        from .environment.aws_environment import AwsEnvironment
-
-        return AwsEnvironment.from_config(config)
-    if env_type == "gcp":
-        from .environment.gcp_environment import GcpEnvironment
-
-        return GcpEnvironment.from_config(config)
-    if env_type == "azure":
-        from .environment.azure_environment import AzureEnvironment
-
-        return AzureEnvironment.from_config(config)
-    raise LaunchError(
-        f"Could not create environment from config. Invalid type: {env_type}"
-    )
+    factory = _environment_factories.get(env_type)
+    if not factory:
+        raise LaunchError(
+            f"Could not create environment from config. Invalid type: {env_type}"
+        )
+    return factory(config)
 
 
 def registry_from_config(
