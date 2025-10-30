@@ -121,10 +121,12 @@ class PolicyLive(FileEventHandler):
         super().__init__(file_path, save_name, file_pusher, *args, **kwargs)
         self._last_uploaded_time: Optional[float] = None
         self._last_uploaded_size: int = 0
+        # Direct assignment and attribute lookup only once for rate limiting
         if settings is not None:
-            if settings.x_live_policy_rate_limit is not None:
-                self.RATE_LIMIT_SECONDS = settings.x_live_policy_rate_limit
-            self._min_wait_time: Optional[float] = settings.x_live_policy_wait_time
+            rate_limit = settings.x_live_policy_rate_limit
+            if rate_limit is not None:
+                self.RATE_LIMIT_SECONDS = rate_limit
+            self._min_wait_time = settings.x_live_policy_wait_time
         else:
             self._min_wait_time = None
 
@@ -134,11 +136,15 @@ class PolicyLive(FileEventHandler):
 
     @classmethod
     def min_wait_for_size(cls, size: int) -> float:
-        if size < 10 * cls.unit_dict["MB"]:
+        # Avoid repeated dict lookups by storing dict in a local variable
+        unit_dict = cls.unit_dict
+        mb = unit_dict["MB"]
+        gb = unit_dict["GB"]
+        if size < 10 * mb:
             return 60
-        elif size < 100 * cls.unit_dict["MB"]:
+        elif size < 100 * mb:
             return 5 * 60
-        elif size < cls.unit_dict["GB"]:
+        elif size < gb:
             return 10 * 60
         else:
             return 20 * 60
@@ -329,9 +335,7 @@ class DirWatcher:
                 make_handler = (
                     PolicyLive
                     if policy_name == "live"
-                    else PolicyNow
-                    if policy_name == "now"
-                    else PolicyEnd
+                    else PolicyNow if policy_name == "now" else PolicyEnd
                 )
                 self._file_event_handlers[save_name] = make_handler(
                     file_path, save_name, self._file_pusher, self._settings
