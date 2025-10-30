@@ -237,10 +237,11 @@ class CohereRequestResponseResolver:
         return return_list
 
     def _resolve_chat_response(self, response: Response) -> List[Dict[str, Any]]:
+        response_dict = response.__dict__
         return [
-            subset_dict(
-                response.__dict__,
-                [
+            {
+                key: response_dict[key]
+                for key in [
                     "response_id",
                     "generation_id",
                     "query",
@@ -249,8 +250,9 @@ class CohereRequestResponseResolver:
                     "prompt",
                     "chatlog",
                     "preamble",
-                ],
-            )
+                ]
+                if key in response_dict
+            }
         ]
 
     def _resolve_classify_response(self, response: Response) -> List[Dict[str, Any]]:
