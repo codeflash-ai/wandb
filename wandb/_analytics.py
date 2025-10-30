@@ -43,7 +43,6 @@ def tracked(func: Callable[P, R]) -> Callable[P, R]:
     If a tracked function calls another tracked function, only the outermost function in
     the call stack will be tracked.
     """
-    func_namespace = f"{func.__module__}.{nameof(func)}"
 
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -51,6 +50,7 @@ def tracked(func: Callable[P, R]) -> Callable[P, R]:
         if tracked_func():
             return func(*args, **kwargs)
 
+        func_namespace = f"{func.__module__}.{nameof(func)}"
         token = _current_func.set(TrackedFuncInfo(func=func_namespace))
         try:
             return func(*args, **kwargs)
