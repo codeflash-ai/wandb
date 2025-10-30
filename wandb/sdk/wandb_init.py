@@ -27,6 +27,7 @@ from typing_extensions import Any, Literal, Protocol, Self
 
 import wandb
 import wandb.env
+import wandb.jupyter
 from wandb import env, trigger
 from wandb.errors import CommError, Error, UsageError
 from wandb.errors.links import url_registry
@@ -63,26 +64,30 @@ def _handle_launch_config(settings: Settings) -> dict[str, Any]:
     launch_run_config: dict[str, Any] = {}
     if not settings.launch:
         return launch_run_config
-    if os.environ.get("WANDB_CONFIG") is not None:
+    wan_db_config = os.environ.get("WANDB_CONFIG")
+    if wan_db_config is not None:
         try:
-            launch_run_config = json.loads(os.environ.get("WANDB_CONFIG", "{}"))
+            launch_run_config = json.loads(wan_db_config)
         except (ValueError, SyntaxError):
             wandb.termwarn("Malformed WANDB_CONFIG, using original config")
     elif settings.launch_config_path and os.path.exists(settings.launch_config_path):
+        # Optimization: Use json.load for direct parsing from file
         with open(settings.launch_config_path) as fp:
-            launch_config = json.loads(fp.read())
+            launch_config = json.load(fp)
         launch_run_config = launch_config.get("overrides", {}).get("run_config")
     else:
+        # Optimization: Build chunks list with list comprehension for environment variable access
         i = 0
         chunks = []
         while True:
             key = f"WANDB_CONFIG_{i}"
-            if key in os.environ:
-                chunks.append(os.environ[key])
-                i += 1
-            else:
+            try:
+                value = os.environ[key]
+            except KeyError:
                 break
-        if len(chunks) > 0:
+            chunks.append(value)
+            i += 1
+        if chunks:
             config_string = "".join(chunks)
             try:
                 launch_run_config = json.loads(config_string)
