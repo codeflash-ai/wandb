@@ -12,6 +12,12 @@ from wandb.proto.wandb_telemetry_pb2 import TelemetryRecord
 if TYPE_CHECKING:
     from .. import wandb_run
 
+import_telemetry_set = {
+    desc.name
+    for desc in TelemetryImports.DESCRIPTOR.fields
+    if desc.type == desc.TYPE_BOOL
+}
+
 
 _LABEL_TOKEN: str = "@wandbcode{"
 
@@ -81,11 +87,6 @@ def _parse_label_lines(lines: List[str]) -> Dict[str, str]:
 
 
 def list_telemetry_imports(only_imported: bool = False) -> Set[str]:
-    import_telemetry_set = {
-        desc.name
-        for desc in TelemetryImports.DESCRIPTOR.fields
-        if desc.type == desc.TYPE_BOOL
-    }
     if only_imported:
         imported_modules_set = set(sys.modules)
         return imported_modules_set.intersection(import_telemetry_set)
