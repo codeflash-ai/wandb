@@ -43,19 +43,17 @@ import wandb
 
 
 def full_path_exists(full_func):
-    def get_parent_child_pairs(full_func):
-        components = full_func.split(".")
-        parents, children = [], []
-        for i, _ in enumerate(components[:-1], 1):
-            parent = ".".join(components[:i])
-            child = components[i]
-            parents.append(parent)
-            children.append(child)
-        return zip(parents, children)
-
-    for parent, child in get_parent_child_pairs(full_func):
-        module = wandb.util.get_module(parent)
-        if not module or not hasattr(module, child) or getattr(module, child) is None:
+    split = full_func.split(".")
+    get_module = wandb.util.get_module
+    for i in range(1, len(split)):
+        parent = ".".join(split[:i])
+        child = split[i]
+        module = get_module(parent)
+        if module is None:
+            return False
+        # Only do attribute checks if module is not None
+        attr = getattr(module, child, None)
+        if attr is None:
             return False
     return True
 
