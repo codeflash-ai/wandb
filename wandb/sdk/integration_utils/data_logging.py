@@ -222,13 +222,15 @@ def _make_example(data: Any) -> Optional[Union[Dict, Sequence, Any]]:
 
 def _get_example_shape(example: Union[Sequence, Any]):
     """Get the shape of an object if applicable."""
-    shape = []
-    if not isinstance(example, str) and hasattr(example, "__len__"):
-        length = len(example)
-        shape = [length]
-        if length > 0:
-            shape += _get_example_shape(example[0])
-    return shape
+    # Fast-path: skip recursion for strings and non-sequences
+    if isinstance(example, str) or not hasattr(example, "__len__"):
+        return []
+    length = len(example)
+    if length == 0:
+        return [0]
+    # Avoid repeated list allocations by using tuple and concatenation
+    subshape = _get_example_shape(example[0])
+    return [length, *subshape]
 
 
 def _bind(lambda_fn: Callable, **closure_kwargs: Any) -> Callable:
@@ -291,8 +293,8 @@ def _infer_single_example_keyed_processor(
     ):
         # assume this is a class
         if class_labels_table is not None:
-            processors["class"] = (
-                lambda n, d, p: class_labels_table.index_ref(d[0])
+            processors["class"] = lambda n, d, p: (
+                class_labels_table.index_ref(d[0])
                 if d[0] < len(class_labels_table.data)
                 else d[0]
             )  # type: ignore
@@ -410,9 +412,11 @@ def _infer_validation_row_processor(
                 lambda ndx, row, key_processor, key: key_processor(
                     ndx,
                     row[key],
-                    row[input_col_name]
-                    if not isinstance(example_input, dict)
-                    else None,
+                    (
+                        row[input_col_name]
+                        if not isinstance(example_input, dict)
+                        else None
+                    ),
                 ),
                 key_processor=key_processors[p_key],
                 key=key,
@@ -461,9 +465,11 @@ def _infer_prediction_row_processor(
                 lambda ndx, row, key_processor, key: key_processor(
                     ndx,
                     row[key],
-                    ndx.get_row().get("val_row").get_row().get(input_col_name)
-                    if not isinstance(example_input, dict)
-                    else None,
+                    (
+                        ndx.get_row().get("val_row").get_row().get(input_col_name)
+                        if not isinstance(example_input, dict)
+                        else None
+                    ),
                 ),
                 key_processor=key_processors[p_key],
                 key=key,
