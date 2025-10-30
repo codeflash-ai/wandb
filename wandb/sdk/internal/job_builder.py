@@ -174,13 +174,19 @@ class JobBuilder:
         self._logged_code_artifact = None
         self._job_seq_id = None
         self._job_version_alias = None
-        self._disable = settings.disable_job_creation or settings.x_disable_machine_info
+        # Merge two settings checks to minimize attribute lookups
+        disable_job_creation = getattr(settings, "disable_job_creation", False)
+        x_disable_machine_info = getattr(settings, "x_disable_machine_info", False)
+        self._disable = disable_job_creation or x_disable_machine_info
         self._partial_source_id = None
         self._aliases = []
         self._source_type: Optional[Literal["repo", "artifact", "image"]] = (
             settings.job_source  # type: ignore[assignment]
         )
-        self._is_notebook_run = self._get_is_notebook_run()
+        # Inline _get_is_notebook_run to avoid method call overhead
+        self._is_notebook_run = hasattr(self._settings, "_jupyter") and bool(
+            getattr(self._settings, "_jupyter", False)
+        )
         self._verbose = verbose
         self._partial = False
         self._services = {}
@@ -391,7 +397,8 @@ class JobBuilder:
         return hasattr(self._settings, "_jupyter") and bool(self._settings._jupyter)
 
     def _is_colab_run(self) -> bool:
-        return hasattr(self._settings, "_colab") and bool(self._settings._colab)
+        # Use getattr to avoid double attribute lookup
+        return bool(getattr(self._settings, "_colab", False))
 
     def _build_job_source(
         self,
