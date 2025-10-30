@@ -33,6 +33,8 @@ _logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from wandb.proto.wandb_internal_pb2 import ArtifactRecord
 
+_TAG_REGEX = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
+
 FROZEN_REQUIREMENTS_FNAME = "requirements.frozen.txt"
 JOB_FNAME = "wandb-job.json"
 JOB_ARTIFACT_TYPE = "job"
@@ -348,16 +350,15 @@ class JobBuilder:
         assert isinstance(image_name, str)
 
         raw_image_name = image_name
-        if ":" in image_name:
-            tag = image_name.split(":")[-1]
+        colon_idx = image_name.rfind(":")
+        if colon_idx != -1:
+            tag = image_name[colon_idx + 1 :]
+            # Fast regex match (precompiled)
+            if _TAG_REGEX.match(tag):
+                raw_image_name = raw_image_name[:colon_idx]
+                self._aliases.append(tag)
 
-            # if tag looks properly formatted, assume its a tag
-            # regex: alphanumeric and "_" "-" "."
-            if re.fullmatch(r"([a-zA-Z0-9_\-\.]+)", tag):
-                raw_image_name = raw_image_name.replace(f":{tag}", "")
-                self._aliases += [tag]
-
-        source: ImageSourceDict = {
+        source: "ImageSourceDict" = {
             "image": image_name,
         }
         name = self._make_job_name(raw_image_name)
@@ -366,10 +367,12 @@ class JobBuilder:
 
     def _make_job_name(self, input_str: str) -> str:
         """Use job name from settings if provided, else use programmatic name."""
+        # Avoid string formatting if possible
         if self._settings.job_name:
             return self._settings.job_name
-
-        return make_artifact_name_safe(f"job-{input_str}")
+        job_name_prefix = "job-"
+        # Avoid f-string overhead by direct concatenation
+        return make_artifact_name_safe(job_name_prefix + input_str)
 
     def _get_entrypoint(
         self,
