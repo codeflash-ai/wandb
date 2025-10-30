@@ -1184,7 +1184,7 @@ class JoinedTable(Media):
         super().__init__()
 
         if not isinstance(join_key, str) and (
-            not isinstance(join_key, list) or len(join_key) != 2
+            not (isinstance(join_key, list) and len(join_key) == 2)
         ):
             raise ValueError(
                 "JoinedTable join_key should be a string or a list of two strings"
@@ -1232,29 +1232,33 @@ class JoinedTable(Media):
 
     def _ensure_table_in_artifact(self, table, artifact, table_ndx):
         """Helper method to add the table to the incoming artifact. Returns the path."""
-        if isinstance(table, Table) or isinstance(table, PartitionedTable):
-            table_name = f"t{table_ndx}_{str(id(self))}"
-            if (
-                table._artifact_source is not None
-                and table._artifact_source.name is not None
-            ):
-                table_name = os.path.basename(table._artifact_source.name)
+        # Single isinstance call for both Table and PartitionedTable
+        if isinstance(table, (Table, PartitionedTable)):
+            table_name = f"t{table_ndx}_{id(self)}"
+            artifact_source = getattr(table, "_artifact_source", None)
+            artifact_source_name = getattr(artifact_source, "name", None) if artifact_source else None
+            if artifact_source_name is not None:
+                table_name = os.path.basename(artifact_source_name)
             entry = artifact.add(table, table_name)
             table = entry.path
         # Check if this is an ArtifactManifestEntry
         elif hasattr(table, "ref_url"):
-            # Give the new object a unique, yet deterministic name
             name = binascii.hexlify(base64.standard_b64decode(table.digest)).decode(
                 "ascii"
             )[:20]
+            split_name = table.name.split(".")
+            suffix = split_name[-2] if len(split_name) >= 2 else ""
             entry = artifact.add_reference(
-                table.ref_url(), "{}.{}.json".format(name, table.name.split(".")[-2])
+                table.ref_url(), f"{name}.{suffix}.json"
             )[0]
             table = entry.path
 
-        err_str = "JoinedTable table:{} not found in artifact. Add a table to the artifact using Artifact#add(<table>, {}) before adding this JoinedTable"
+        # Combined string formatting in one step to avoid repeated work in error paths
         if table not in artifact._manifest.entries:
-            raise ValueError(err_str.format(table, table))
+            raise ValueError(
+                f"JoinedTable table:{table} not found in artifact. "
+                f"Add a table to the artifact using Artifact#add(<table>, {table}) before adding this JoinedTable"
+            )
 
         return table
 
@@ -1272,13 +1276,9 @@ class JoinedTable(Media):
         else:
             table1 = self._ensure_table_in_artifact(self._table1, artifact_or_run, 1)
             table2 = self._ensure_table_in_artifact(self._table2, artifact_or_run, 2)
-            json_obj.update(
-                {
-                    "table1": table1,
-                    "table2": table2,
-                    "join_key": self._join_key,
-                }
-            )
+            json_obj["table1"] = table1
+            json_obj["table2"] = table2
+            json_obj["join_key"] = self._join_key
         return json_obj
 
     def __ne__(self, other):
