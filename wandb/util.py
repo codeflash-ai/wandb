@@ -65,6 +65,7 @@ from wandb.sdk.internal.thread_local_settings import _thread_local_api_settings
 from wandb.sdk.lib import filesystem, runid
 from wandb.sdk.lib.json_util import dump, dumps
 from wandb.sdk.lib.paths import FilePathStr, StrPath
+from functools import lru_cache
 
 if TYPE_CHECKING:
     import wandb.sdk.internal.settings_static
@@ -239,12 +240,13 @@ def get_module(
     :param (bool) lazy: If True, return a lazy loader for the module.
     :return: (module|None) If import succeeds, the module will be returned.
     """
+    # Only cache when importable not previously reported
     if name not in _not_importable:
         try:
-            if not lazy:
-                return import_module(name)
+            if lazy:
+                return _get_module_lazy_cached(name)
             else:
-                return import_module_lazy(name)
+                return _get_module_nonlazy_cached(name)
         except Exception:
             _not_importable.add(name)
             msg = f"Error importing optional module {name}"
@@ -2029,6 +2031,14 @@ def get_core_path() -> str:
         )
 
     return str(bin_path)
+
+@lru_cache(maxsize=128)
+def _get_module_lazy_cached(name: str) -> Any:
+    return import_module_lazy(name)
+
+@lru_cache(maxsize=128)
+def _get_module_nonlazy_cached(name: str) -> Any:
+    return import_module(name)
 
 
 class NonOctalStringDumper(yaml.Dumper):
