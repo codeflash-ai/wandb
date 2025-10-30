@@ -58,7 +58,6 @@ def gather_batch(
     clock: Callable[[], float] = time.monotonic,
 ) -> Tuple[bool, Sequence[RequestPrepare]]:
     batch_start_time = clock()
-    remaining_time = batch_time
 
     first_request = request_queue.get()
     if isinstance(first_request, RequestFinish):
@@ -66,7 +65,10 @@ def gather_batch(
 
     batch: List[RequestPrepare] = [first_request]
 
-    while remaining_time > 0 and len(batch) < max_batch_size:
+    while len(batch) < max_batch_size:
+        remaining_time = batch_time - (clock() - batch_start_time)
+        if remaining_time <= 0:
+            break
         try:
             request = request_queue.get(
                 timeout=_clamp(
@@ -79,7 +81,6 @@ def gather_batch(
                 return True, batch
 
             batch.append(request)
-            remaining_time = batch_time - (clock() - batch_start_time)
 
         except queue.Empty:
             break
