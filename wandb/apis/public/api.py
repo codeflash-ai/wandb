@@ -143,9 +143,14 @@ class RetryingClient:
     ) -> bool:  # User not encouraged to use this class directly
         from packaging.version import parse
 
-        return parse(min_version) <= parse(
-            self.server_info["cliVersionInfo"]["max_cli_version"]
-        )
+        max_cli_version = self.server_info["cliVersionInfo"]["max_cli_version"]
+        if (
+            not hasattr(self, "_parsed_max_cli_version")
+            or self._parsed_max_cli_version_src != max_cli_version
+        ):
+            self._parsed_max_cli_version = parse(max_cli_version)
+            self._parsed_max_cli_version_src = max_cli_version
+        return parse(min_version) <= self._parsed_max_cli_version
 
 
 class Api:
