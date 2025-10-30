@@ -100,13 +100,15 @@ class HuggingFacePipelineRequestResponseResolver:
         :returns: Model if available, None otherwise
         """
         model = pipe.model
-        try:
-            return model.model
-        except AttributeError:
-            logger.info(
-                "Model does not have a `.model` attribute. Assuming `pipe.model` is the correct model."
-            )
-            return model
+        if hasattr(model, "model"):
+            try:
+                return model.model
+            except AttributeError:
+                pass
+        logger.info(
+            "Model does not have a `.model` attribute. Assuming `pipe.model` is the correct model."
+        )
+        return model
 
     @staticmethod
     def _transform_task_specific_data(
