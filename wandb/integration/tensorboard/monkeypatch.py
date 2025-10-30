@@ -82,7 +82,7 @@ def patch(
             save=save,
             root_logdir=root_logdir,
         )
-    if not c_writer and not tb_writer and not tb_writer:
+    if not c_writer and not py_writer and not tb_writer and not pt_writer and not tbx_writer:
         wandb.termerror("Unsupported tensorboard configuration")
 
 
