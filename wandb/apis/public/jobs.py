@@ -335,10 +335,14 @@ class QueuedRun:
             "runQueue": self.queue_name,
         }
         res = self.client.execute(query, variable_values)
+        edges = res["project"]["runQueue"]["runQueueItems"]["edges"]
 
-        for item in res["project"]["runQueue"]["runQueueItems"]["edges"]:
-            if str(item["node"]["id"]) == str(self.id):
-                return item["node"]
+        # Fast comparison for stringified IDs
+        id_str = str(self.id)
+        for item in edges:
+            node = item["node"]
+            if str(node["id"]) == id_str:
+                return node
 
     @normalize_exceptions
     def _get_item(self):
