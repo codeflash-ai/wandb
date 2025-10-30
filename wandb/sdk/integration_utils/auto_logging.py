@@ -1,4 +1,3 @@
-import asyncio
 import functools
 import inspect
 import logging
@@ -73,63 +72,73 @@ class PatchAPI:
 
     def patch(self, run: "wandb.Run") -> None:
         """Patches the API to log media or metrics to W&B."""
+        # Precompute reduce(getattr, ...) for symbol patching targets to avoid redundant computation
+        api_root = self.set_api
         for symbol in self.symbols:
-            # split on dots, e.g. "Client.generate" -> ["Client", "generate"]
             symbol_parts = symbol.split(".")
-            # and get the attribute from the module
-            original = functools.reduce(getattr, symbol_parts, self.set_api)
 
+            # Fast path for single-part symbols, avoids reduce overhead
+            if len(symbol_parts) == 1:
+                target_obj = api_root
+                attr_name = symbol_parts[0]
+            else:
+                # Only compute once per symbol for performance
+                target_obj = functools.reduce(getattr, symbol_parts[:-1], api_root)
+                attr_name = symbol_parts[-1]
+
+            original = getattr(target_obj, attr_name)
+
+            # method_factory is defined (and potentially redefined) inside loop, but closure usage is safe here
             def method_factory(original_method: Any):
-                async def async_method(*args, **kwargs):
-                    future = asyncio.Future()
-
-                    async def callback(coro):
-                        try:
-                            result = await coro
-                            loggable_dict = self.resolver(
-                                args, kwargs, result, timer.start_time, timer.elapsed
-                            )
-                            if loggable_dict is not None:
-                                run.log(loggable_dict)
-                            future.set_result(result)
-                        except Exception as e:
-                            logger.warning(e)
-
-                    with Timer() as timer:
-                        coro = original_method(*args, **kwargs)
-                        asyncio.ensure_future(callback(coro))
-
-                    return await future
-
-                def sync_method(*args, **kwargs):
-                    with Timer() as timer:
-                        result = original_method(*args, **kwargs)
-                        try:
-                            loggable_dict = self.resolver(
-                                args, kwargs, result, timer.start_time, timer.elapsed
-                            )
-                            if loggable_dict is not None:
-                                run.log(loggable_dict)
-                        except Exception as e:
-                            logger.warning(e)
-                        return result
-
+                # Avoid recreating async wrappers where not needed: define only once per method
                 if inspect.iscoroutinefunction(original_method):
-                    return functools.wraps(original_method)(async_method)
+
+                    @functools.wraps(original_method)
+                    async def async_method(*args, **kwargs):
+                        with Timer() as timer:
+                            try:
+                                result = await original_method(*args, **kwargs)
+                                loggable_dict = self.resolver(
+                                    args,
+                                    kwargs,
+                                    result,
+                                    timer.start_time,
+                                    timer.elapsed,
+                                )
+                                if loggable_dict is not None:
+                                    run.log(loggable_dict)
+                                return result
+                            except Exception as e:
+                                logger.warning(e)
+                                raise  # Preserve original async exception propagation
+
+                    return async_method
                 else:
-                    return functools.wraps(original_method)(sync_method)
+
+                    @functools.wraps(original_method)
+                    def sync_method(*args, **kwargs):
+                        with Timer() as timer:
+                            result = original_method(*args, **kwargs)
+                            try:
+                                loggable_dict = self.resolver(
+                                    args,
+                                    kwargs,
+                                    result,
+                                    timer.start_time,
+                                    timer.elapsed,
+                                )
+                                if loggable_dict is not None:
+                                    run.log(loggable_dict)
+                            except Exception as e:
+                                logger.warning(e)
+                            return result
+
+                    return sync_method
 
             # save original method
             self.original_methods[symbol] = original
             # monkey patch the method
-            if len(symbol_parts) == 1:
-                setattr(self.set_api, symbol_parts[0], method_factory(original))
-            else:
-                setattr(
-                    functools.reduce(getattr, symbol_parts[:-1], self.set_api),
-                    symbol_parts[-1],
-                    method_factory(original),
-                )
+            setattr(target_obj, attr_name, method_factory(original))
 
     def unpatch(self) -> None:
         """Unpatches the API."""
@@ -145,6 +154,11 @@ class PatchAPI:
                     symbol_parts[-1],
                     original,
                 )
+
+    @property
+    def set_api(self) -> Any:
+        # Preserve expected attribute access point; do not change logic
+        return self._api
 
 
 class AutologAPI:
