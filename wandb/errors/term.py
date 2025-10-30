@@ -284,8 +284,7 @@ class DynamicBlock:
             term_width = _shutil_get_terminal_width()
             click.echo(
                 "\n".join(
-                    _ansi_shorten(line, term_width)  #
-                    for line in self._lines_to_print
+                    _ansi_shorten(line, term_width) for line in self._lines_to_print  #
                 ),
                 file=sys.stderr,
             )
@@ -342,28 +341,44 @@ def _log(
     silent: bool = False,
     level: int = logging.INFO,
 ) -> None:
-    with _dynamic_text_lock, _l_above_dynamic_text():
+    # Cache global lookups locally for speed
+    dynamic_text_lock = _dynamic_text_lock
+    l_above_dynamic_text = _l_above_dynamic_text
+    printed_messages = _printed_messages
+    logger = _logger
+    log_string = LOG_STRING
+    _silent_flag = _silent
+
+    # Fast in: string empty skip most work, common case first
+    if not repeat and string in printed_messages:
+        return
+
+    with dynamic_text_lock, l_above_dynamic_text():
         if not repeat:
-            if string in _printed_messages:
-                return
+            # Safely add only if not too many
+            if len(printed_messages) < 1000:
+                printed_messages.add(string)
 
-            if len(_printed_messages) < 1000:
-                _printed_messages.add(string)
+        # Only prefix if needed, and avoid str.split allocation if single-line
+        if prefix and ("\n" in string):
+            string = "\n".join([f"{log_string}: {s}" for s in string.split("\n")])
+        elif prefix:
+            string = f"{log_string}: {string}"
 
-        if prefix:
-            string = "\n".join([f"{LOG_STRING}: {s}" for s in string.split("\n")])
-
-        silent = silent or _silent
-        if not silent:
+        is_silent = silent or _silent_flag
+        if not is_silent:
+            # click.echo does type/encoding checks, but call it only if needed
             click.echo(string, file=sys.stderr, nl=newline)
-        elif not _logger:
-            pass  # No fallback logger, so nothing to do.
-        elif level == logging.ERROR:
-            _logger.error(click.unstyle(string))
-        elif level == logging.WARNING:
-            _logger.warning(click.unstyle(string))
-        else:
-            _logger.info(click.unstyle(string))
+        elif logger:
+            # Unstyle string once
+            msg = click.unstyle(string)
+            if level == logging.ERROR:
+                logger.error(msg)
+            elif level == logging.WARNING:
+                logger.warning(msg)
+            else:
+                logger.info(msg)
+        # else: silent and no logger, do nothing
 
 
 def _l_rerender_dynamic_blocks() -> None:
