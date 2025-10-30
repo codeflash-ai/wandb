@@ -121,13 +121,15 @@ def get_min_supported_for_source_dict(
     source: Union[GitSourceDict, ArtifactSourceDict, ImageSourceDict],
 ) -> Optional[Version]:
     """Get the minimum supported wandb version the source dict of wandb-job.json."""
-    min_seen = None
-    for key in source:
-        new_ver = SOURCE_KEYS_MIN_SUPPORTED_VERSION.get(key)
-        if new_ver:
-            if min_seen is None or new_ver < min_seen:
-                min_seen = new_ver
-    return min_seen
+    # Avoid repeated .get() calls and new_ver checks
+    min_ver = None
+    source_keys = SOURCE_KEYS_MIN_SUPPORTED_VERSION
+    # Iterate only over relevant keys using set intersection to avoid unnecessary lookups
+    for key in source_keys.keys() & source.keys():
+        new_ver = source_keys[key]
+        if min_ver is None or new_ver < min_ver:
+            min_ver = new_ver
+    return min_ver
 
 
 class JobBuilder:
