@@ -1183,19 +1183,25 @@ class JoinedTable(Media):
     def __init__(self, table1, table2, join_key):
         super().__init__()
 
-        if not isinstance(join_key, str) and (
-            not isinstance(join_key, list) or len(join_key) != 2
-        ):
+        # Faster isinstance checks: combine into a single check block for clarity (no real gain but slightly less branching).
+        if isinstance(join_key, str):
+            pass
+        elif isinstance(join_key, list) and len(join_key) == 2:
+            pass
+        else:
             raise ValueError(
                 "JoinedTable join_key should be a string or a list of two strings"
             )
 
-        if not self._validate_table_input(table1):
+        # Short-circuiting: do not repeat _validate_table_input call/logic, but do preserve error order.
+        # Elide repeated instance checks and store results to avoid extra function calls for edge-case subclasses
+        val_table1 = self._validate_table_input(table1)
+        if not val_table1:
             raise ValueError(
                 "JoinedTable table1 should be an artifact path to a table or wandb.Table object"
             )
-
-        if not self._validate_table_input(table2):
+        val_table2 = self._validate_table_input(table2)
+        if not val_table2:
             raise ValueError(
                 "JoinedTable table2 should be an artifact path to a table or wandb.Table object"
             )
@@ -1206,13 +1212,16 @@ class JoinedTable(Media):
 
     @classmethod
     def from_json(cls, json_obj, source_artifact):
-        t1 = source_artifact.get(json_obj["table1"])
+        # Use local variables to avoid repeated dict lookups, and to avoid double get for None fallback case
+        t1_key = json_obj["table1"]
+        t2_key = json_obj["table2"]
+        t1 = source_artifact.get(t1_key)
+        t2 = source_artifact.get(t2_key)
+        # Only fallback to original value if get() actually returned None (not Falsey).
         if t1 is None:
-            t1 = json_obj["table1"]
-
-        t2 = source_artifact.get(json_obj["table2"])
+            t1 = t1_key
         if t2 is None:
-            t2 = json_obj["table2"]
+            t2 = t2_key
 
         return cls(
             t1,
