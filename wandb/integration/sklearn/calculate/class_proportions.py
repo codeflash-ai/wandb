@@ -44,15 +44,11 @@ def make_table(class_column, dataset_column, count_column):
 def make_columns(class_ids, counts_train, counts_test):
     class_column, dataset_column, count_column = [], [], []
 
-    for i in range(len(class_ids)):
+    for i, class_id in enumerate(class_ids):
         # add class counts from training set
-        class_column.append(class_ids[i])
-        dataset_column.append("train")
-        count_column.append(counts_train[i])
-        # add class counts from test set
-        class_column.append(class_ids[i])
-        dataset_column.append("test")
-        count_column.append(counts_test[i])
+        class_column += [class_id, class_id]
+        dataset_column += ["train", "test"]
+        count_column += [counts_train[i], counts_test[i]]
 
         if utils.check_against_limit(
             i,
