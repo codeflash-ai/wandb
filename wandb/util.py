@@ -33,20 +33,8 @@ from datetime import date, datetime, timedelta
 from importlib import import_module
 from sys import getsizeof
 from types import ModuleType
-from typing import (
-    IO,
-    TYPE_CHECKING,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    TextIO,
-    Tuple,
-    Union,
-)
+from typing import (IO, TYPE_CHECKING, Callable, Dict, Iterable, List, Mapping,
+                    Optional, Sequence, TextIO, Tuple, Union)
 
 import requests
 import yaml
@@ -54,13 +42,8 @@ from typing_extensions import Any, Generator, TypeGuard, TypeVar
 
 import wandb
 import wandb.env
-from wandb.errors import (
-    AuthenticationError,
-    CommError,
-    UsageError,
-    WandbCoreNotAvailableError,
-    term,
-)
+from wandb.errors import (AuthenticationError, CommError, UsageError,
+                          WandbCoreNotAvailableError, term)
 from wandb.sdk.internal.thread_local_settings import _thread_local_api_settings
 from wandb.sdk.lib import filesystem, runid
 from wandb.sdk.lib.json_util import dump, dumps
@@ -233,24 +216,24 @@ def get_module(
     lazy: bool = True,
 ) -> Any:
     """Return module or None. Absolute import is required.
-
     :param (str) name: Dot-separated module path. E.g., 'scipy.stats'.
     :param (str) required: A string to raise a ValueError if missing
     :param (bool) lazy: If True, return a lazy loader for the module.
     :return: (module|None) If import succeeds, the module will be returned.
     """
-    if name not in _not_importable:
+    not_importable = _not_importable  # Local alias for performance
+    if name not in not_importable:
         try:
             if not lazy:
                 return import_module(name)
             else:
                 return import_module_lazy(name)
         except Exception:
-            _not_importable.add(name)
+            not_importable.add(name)
             msg = f"Error importing optional module {name}"
             if required:
                 logger.exception(msg)
-    if required and name in _not_importable:
+    if required and name in not_importable:
         raise wandb.Error(required)
 
 
@@ -503,7 +486,6 @@ def ensure_matplotlib_figure(obj: Any) -> Any:
     """
     import matplotlib  # type: ignore
     from matplotlib.figure import Figure  # type: ignore
-
     # there are combinations of plotly and matplotlib versions that don't work well together,
     # this patches matplotlib to add a removed method that plotly assumes exists
     from matplotlib.spines import Spine  # type: ignore
