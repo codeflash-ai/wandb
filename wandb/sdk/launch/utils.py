@@ -7,17 +7,8 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import (TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple,
+                    Union, cast)
 
 import click
 
@@ -30,17 +21,16 @@ from wandb.sdk.launch.git_reference import GitReference
 from wandb.sdk.launch.wandb_reference import WandbReference
 from wandb.sdk.wandb_config import Config
 
-from .builder.templates._wandb_bootstrap import (
-    FAILED_PACKAGES_POSTFIX,
-    FAILED_PACKAGES_PREFIX,
-)
+from .builder.templates._wandb_bootstrap import (FAILED_PACKAGES_POSTFIX,
+                                                 FAILED_PACKAGES_PREFIX)
 
 FAILED_PACKAGES_REGEX = re.compile(
     f"{re.escape(FAILED_PACKAGES_PREFIX)}(.*){re.escape(FAILED_PACKAGES_POSTFIX)}"
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from wandb.sdk.launch.agent.job_status_tracker import JobAndRunStatusTracker
+    from wandb.sdk.launch.agent.job_status_tracker import \
+        JobAndRunStatusTracker
 
 
 # TODO: this should be restricted to just Git repos and not S3 and stuff like that
@@ -390,9 +380,9 @@ def diff_pip_requirements(req_1: List[str], req_2: List[str]) -> Dict[str, str]:
             else:
                 raise ValueError(f"Unable to parse pip requirements file line: {line}")
             if _name is not None:
-                assert re.match(_VALID_PIP_PACKAGE_REGEX, _name), (
-                    f"Invalid pip package name {_name}"
-                )
+                assert re.match(
+                    _VALID_PIP_PACKAGE_REGEX, _name
+                ), f"Invalid pip package name {_name}"
                 d[_name] = _version
         return d
 
