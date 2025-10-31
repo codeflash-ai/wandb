@@ -50,7 +50,10 @@ def postprocess_pils_to_np(image: List) -> "np_array":
         required="Please ensure NumPy is installed. You can run `pip install numpy` to install it.",
     )
     return np.stack(
-        [np.transpose(np.array(img).astype("uint8"), axes=(2, 0, 1)) for img in image],
+        [
+            np.transpose(np.array(img, dtype="uint8", copy=False), axes=(2, 0, 1))
+            for img in image
+        ],
         axis=0,
     )
 

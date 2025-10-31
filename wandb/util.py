@@ -33,20 +33,8 @@ from datetime import date, datetime, timedelta
 from importlib import import_module
 from sys import getsizeof
 from types import ModuleType
-from typing import (
-    IO,
-    TYPE_CHECKING,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    TextIO,
-    Tuple,
-    Union,
-)
+from typing import (IO, TYPE_CHECKING, Callable, Dict, Iterable, List, Mapping,
+                    Optional, Sequence, TextIO, Tuple, Union)
 
 import requests
 import yaml
@@ -54,13 +42,8 @@ from typing_extensions import Any, Generator, TypeGuard, TypeVar
 
 import wandb
 import wandb.env
-from wandb.errors import (
-    AuthenticationError,
-    CommError,
-    UsageError,
-    WandbCoreNotAvailableError,
-    term,
-)
+from wandb.errors import (AuthenticationError, CommError, UsageError,
+                          WandbCoreNotAvailableError, term)
 from wandb.sdk.internal.thread_local_settings import _thread_local_api_settings
 from wandb.sdk.lib import filesystem, runid
 from wandb.sdk.lib.json_util import dump, dumps
@@ -503,7 +486,6 @@ def ensure_matplotlib_figure(obj: Any) -> Any:
     """
     import matplotlib  # type: ignore
     from matplotlib.figure import Figure  # type: ignore
-
     # there are combinations of plotly and matplotlib versions that don't work well together,
     # this patches matplotlib to add a removed method that plotly assumes exists
     from matplotlib.spines import Spine  # type: ignore
