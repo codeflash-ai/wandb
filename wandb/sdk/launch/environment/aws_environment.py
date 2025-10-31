@@ -35,10 +35,8 @@ class AwsEnvironment(AbstractEnvironment):
         session_token: str,
     ) -> None:
         """Initialize the AWS environment.
-
         Arguments:
             region (str): The AWS region.
-
         Raises:
             LaunchError: If the AWS environment is not configured correctly.
         """
@@ -127,9 +125,10 @@ class AwsEnvironment(AbstractEnvironment):
         """Set the partition for the AWS environment."""
         try:
             session = await self.get_session()
-            client = await event_loop_thread_exec(session.client)("sts")
-            get_caller_identity = event_loop_thread_exec(client.get_caller_identity)
-            identity = await get_caller_identity()
+            # Directly create the client synchronously (this is not a blocking network call)
+            client = session.client("sts")
+            # Offload the network-bound identity API call only
+            identity = await event_loop_thread_exec(client.get_caller_identity)()
             arn = identity.get("Arn")
             if not arn:
                 raise LaunchError(
@@ -167,22 +166,21 @@ class AwsEnvironment(AbstractEnvironment):
 
     async def get_session(self) -> "boto3.Session":  # type: ignore
         """Get an AWS session.
-
         Returns:
             boto3.Session: The AWS session.
-
         Raises:
             LaunchError: If the AWS session could not be created.
         """
         _logger.debug(f"Creating AWS session in region {self._region}")
         try:
-            session = event_loop_thread_exec(boto3.Session)
-            return await session(
+            # boto3.Session constructor is lightweight (not blocking), so call synchronously
+            session = boto3.Session(
                 region_name=self._region,
                 aws_access_key_id=self._access_key,
                 aws_secret_access_key=self._secret_key,
                 aws_session_token=self._session_token,
             )
+            return session
         except botocore.exceptions.ClientError as e:
             raise LaunchError(f"Could not create AWS session. {e}")
 
