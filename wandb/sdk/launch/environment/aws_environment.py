@@ -1,5 +1,6 @@
 """Implements the AWS environment."""
 
+import asyncio
 import logging
 import os
 from typing import Dict, Optional
@@ -35,10 +36,8 @@ class AwsEnvironment(AbstractEnvironment):
         session_token: str,
     ) -> None:
         """Initialize the AWS environment.
-
         Arguments:
             region (str): The AWS region.
-
         Raises:
             LaunchError: If the AWS environment is not configured correctly.
         """
@@ -167,17 +166,16 @@ class AwsEnvironment(AbstractEnvironment):
 
     async def get_session(self) -> "boto3.Session":  # type: ignore
         """Get an AWS session.
-
         Returns:
             boto3.Session: The AWS session.
-
         Raises:
             LaunchError: If the AWS session could not be created.
         """
         _logger.debug(f"Creating AWS session in region {self._region}")
         try:
-            session = event_loop_thread_exec(boto3.Session)
-            return await session(
+            # Use asyncio.to_thread for running blocking boto3.Session constructor in a thread
+            return await asyncio.to_thread(
+                boto3.Session,
                 region_name=self._region,
                 aws_access_key_id=self._access_key,
                 aws_secret_access_key=self._secret_key,
