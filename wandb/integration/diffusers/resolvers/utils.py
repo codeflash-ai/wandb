@@ -62,8 +62,12 @@ def postprocess_np_arrays_for_video(
         "numpy",
         required="Please ensure NumPy is installed. You can run `pip install numpy` to install it.",
     )
-    images = [(img * 255).astype("uint8") for img in images] if normalize else images
-    return np.transpose(np.stack((images), axis=0), axes=(0, 3, 1, 2))
+    if normalize:
+        arr = np.asarray(images)
+        arr = (arr * 255).astype("uint8")
+    else:
+        arr = np.stack(images, axis=0)
+    return np.transpose(arr, axes=(0, 3, 1, 2))
 
 
 def decode_sdxl_t2i_latents(pipeline: Any, latents: "torch_float_tensor") -> List:
