@@ -424,11 +424,12 @@ class Graph(Media):
                 nodes += v
             if sequential_like:
                 # search for shared layers
+                nodes_set = set(nodes)
                 for layer in model.layers:
                     flag = False
                     if hasattr(layer, "_inbound_nodes"):
                         for node in layer._inbound_nodes:
-                            if node in nodes:
+                            if node in nodes_set:
                                 if flag:
                                     sequential_like = False
                                     break
