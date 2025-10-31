@@ -217,10 +217,13 @@ class Files(SizedPaginator["File"]):
 
         <!-- lazydoc-ignore: internal -->
         """
-        return [
-            File(self.client, r["node"], self.run)
-            for r in self.last_response["project"]["run"]["files"]["edges"]
-        ]
+        response = self.last_response
+        run_files_edges = response["project"]["run"]["files"]["edges"]
+        client = self.client
+        run = self.run
+        File_ = File
+
+        return [File_(client, r["node"], run) for r in run_files_edges]
 
     def __repr__(self):
         return "<Files {} ({})>".format("/".join(self.run.path), len(self))
@@ -362,7 +365,9 @@ class File(Attrs):
                     success
                 }}
             }}
-            """.format(project_id_variable_fragment, project_id_mutation_fragment)
+            """.format(
+            project_id_variable_fragment, project_id_mutation_fragment
+        )
         mutation = gql(mutation_string)
 
         self.client.execute(
